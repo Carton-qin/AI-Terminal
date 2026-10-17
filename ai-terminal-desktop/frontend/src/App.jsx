@@ -398,7 +398,7 @@ export default function App() {
           onRegisterInjectHandler={(fn) => (injectHandlerRef.current = fn)}
           onRegisterBufferReader={(fn) => (bufferReaderRef.current = fn)}
           onTerminalError={({ tabId, errorSnippet }) => {
-            setTerminalErrors((prev) => ({ ...prev, [tabId]: errorSnippet }))
+            setTerminalErrors((prev) => (prev[tabId] === errorSnippet ? prev : { ...prev, [tabId]: errorSnippet }))
           }}
           onAskAi={handleAskAi}
           hosts={hosts}

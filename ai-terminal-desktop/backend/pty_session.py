@@ -90,7 +90,8 @@ class PTYSession:
             def _win_read_loop():
                 while self.proc and self.proc.poll() is None:
                     try:
-                        data = self.proc.stdout.read(1024)
+                        read_fn = getattr(self.proc.stdout, "read1", self.proc.stdout.read)
+                        data = read_fn(16384)
                         if not data:
                             break
                         if self._loop and self._read_callback:
@@ -106,7 +107,7 @@ class PTYSession:
 
     def _on_read(self):
         try:
-            data = os.read(self.master_fd, 4096)
+            data = os.read(self.master_fd, 16384)
             if data:
                 asyncio.create_task(self._read_callback(data))
             else:

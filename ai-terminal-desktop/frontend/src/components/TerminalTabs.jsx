@@ -305,7 +305,6 @@ export default function TerminalTabs({
 }) {
   const terminalRefs = useRef({})
   const containerRefs = useRef({})
-  const bufferHistory = useRef({})
 
   // 用户持久化终端外观设置
   const [currentTheme, setCurrentTheme] = useState(() => {
@@ -476,23 +475,23 @@ export default function TerminalTabs({
       }
     }
 
-    ws.onmessage = (event) => {
-      let text = ''
-      if (typeof event.data === 'string') {
-        term.write(event.data)
-        text = event.data
-      } else {
-        const uint8 = new Uint8Array(event.data)
-        term.write(uint8)
-        text = new TextDecoder().decode(uint8)
-      }
+    const textDecoder = new TextDecoder()
+    let inspectTimer = null
+    let pendingInspectChunks = []
 
-      const currentBuf = bufferHistory.current[id] || []
-      currentBuf.push(text)
-      if (currentBuf.length > 500) {
-        currentBuf.shift()
+    const flushInspection = () => {
+      inspectTimer = null
+      if (pendingInspectChunks.length === 0) return
+      
+      let text = ''
+      for (let i = 0; i < pendingInspectChunks.length; i++) {
+        const item = pendingInspectChunks[i]
+        text += typeof item === 'string' ? item : textDecoder.decode(item)
       }
-      bufferHistory.current[id] = currentBuf
+      pendingInspectChunks = []
+      if (text.length > 2048) {
+        text = text.slice(-2048)
+      }
 
       if (onTerminalError) {
         const cleanSnippet = text.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
@@ -522,6 +521,24 @@ export default function TerminalTabs({
             setTabCwds((prev) => (prev[id] === rawDir ? prev : { ...prev, [id]: rawDir }))
           }
         }
+      }
+    }
+
+    ws.onmessage = (event) => {
+      // 1. 零延迟即时送入终端渲染，由 xterm 内部高性能引擎处理，不占用任何 JS 堆栈
+      if (typeof event.data === 'string') {
+        term.write(event.data)
+      } else {
+        term.write(new Uint8Array(event.data))
+      }
+
+      // 2. 收集最近数据块供节流分析 (最多保留最后 5 个分块，避免大文件内存积压)
+      pendingInspectChunks.push(event.data)
+      if (pendingInspectChunks.length > 5) {
+        pendingInspectChunks.shift()
+      }
+      if (!inspectTimer) {
+        inspectTimer = setTimeout(flushInspection, 120)
       }
     }
 
@@ -658,9 +675,10 @@ export default function TerminalTabs({
         fontFamily:
           '"JetBrains Mono", "Fira Code", "Cascadia Code", "SF Mono", Menlo, Monaco, Consolas, monospace',
         theme: activeThemeObj,
-        allowTransparency: true,
         scrollback: 10000,
-        smoothScrollDuration: 100,
+        smoothScrollDuration: 0, // 0 = 禁用平滑滚动动画，杜绝高频输出时的逐行滚动卡顿
+        fastScrollSensitivity: 5,
+        scrollOnUserInput: true,
       })
 
       const fitAddon = new FitAddon()
@@ -669,7 +687,6 @@ export default function TerminalTabs({
       term.open(container)
       fitAddon.fit()
 
-      bufferHistory.current[id] = []
       const ws = setupWebSocket(tab, term, false)
 
       term.onData((data) => {
@@ -703,7 +720,6 @@ export default function TerminalTabs({
         if (item.ws) item.ws.close()
         if (item.term) item.term.dispose()
         delete terminalRefs.current[tabId]
-        delete bufferHistory.current[tabId]
         setTabCwds((prev) => {
           if (!prev[tabId]) return prev
           const next = { ...prev }
@@ -760,14 +776,22 @@ export default function TerminalTabs({
     })
   }, [activeTabId, onRegisterInjectHandler])
 
-  // 注册缓冲区读取
+  // 注册缓冲区读取 (直接读取 xterm 原生活动屏缓冲区，零开销、零正则损耗)
   useEffect(() => {
     onRegisterBufferReader(() => {
       if (!activeTabId) return ''
-      const parts = bufferHistory.current[activeTabId] || []
-      const rawText = parts.join('')
-      const cleanText = rawText.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
-      return cleanText.slice(-3000)
+      const item = terminalRefs.current[activeTabId]
+      if (item && item.term) {
+        const buf = item.term.buffer.active
+        const lines = []
+        const start = Math.max(0, buf.length - 80)
+        for (let i = start; i < buf.length; i++) {
+          const line = buf.getLine(i)
+          if (line) lines.push(line.translateToString(true))
+        }
+        return lines.join('\n').trim()
+      }
+      return ''
     })
   }, [activeTabId, onRegisterBufferReader])
 

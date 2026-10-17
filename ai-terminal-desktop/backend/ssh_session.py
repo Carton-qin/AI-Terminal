@@ -36,6 +36,8 @@ class SSHSession:
         self._is_running = False
         self._metrics_running = False
         self.latest_metrics: Optional[Dict[str, Any]] = None
+        self.last_terminal_input: float = 0.0
+        self.last_terminal_output: float = 0.0
 
     def connect(self, read_callback, loop: Optional[asyncio.AbstractEventLoop] = None):
         self._read_callback = read_callback
@@ -65,6 +67,15 @@ class SSHSession:
             timeout=15,
             banner_timeout=30,
         )
+
+        # 启用 TCP_NODELAY，禁用 Nagle 缓冲算法，消除 40~200ms 交互延迟
+        try:
+            import socket
+            transport = self.client.get_transport()
+            if transport and hasattr(transport, "sock") and transport.sock:
+                transport.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except Exception:
+            pass
 
         # 自动探测远端 VPS 的操作系统架构、发行版与环境
         self.os_info = {
@@ -135,21 +146,32 @@ class SSHSession:
         while self._is_running and self.channel and not self.channel.closed:
             try:
                 if self.channel.recv_ready():
-                    data = self.channel.recv(4096)
-                    if not data:
+                    chunks = []
+                    total_bytes = 0
+                    while self.channel.recv_ready() and total_bytes < 32768:
+                        chunk = self.channel.recv(16384)
+                        if not chunk:
+                            break
+                        chunks.append(chunk)
+                        total_bytes += len(chunk)
+                    if not chunks:
                         break
+                    data = b"".join(chunks) if len(chunks) > 1 else chunks[0]
+                    self.last_terminal_output = time.time()
                     if self._loop and self._read_callback:
                         asyncio.run_coroutine_threadsafe(
                             self._read_callback(data),
                             self._loop,
                         )
                 else:
-                    time.sleep(0.01)
+                    time.sleep(0.005)
             except Exception:
                 break
         self.close()
 
     def write(self, data: str | bytes):
+        import time
+        self.last_terminal_input = time.time()
         if self.channel and not self.channel.closed:
             if isinstance(data, str):
                 data = data.encode("utf-8")
@@ -538,10 +560,16 @@ class SSHSession:
                     break
 
                 now_time = time.time()
+
+                # 如果终端前台在过去 1.2 秒内有用户输入或正在流式打印输出，主动延后采样，杜绝与前台终端争抢 SSH Transport 锁与网络带宽
+                if (now_time - self.last_terminal_input < 1.2) or (now_time - self.last_terminal_output < 1.2):
+                    time.sleep(0.5)
+                    continue
+
                 _, stdout, _ = self.client.exec_command(cmd, timeout=4)
                 raw = stdout.read().decode("utf-8", errors="ignore")
 
-                dt = (now_time - prev_time) if prev_time else 2.5
+                dt = (now_time - prev_time) if prev_time else 3.5
                 metrics = self._parse_metrics(raw, prev_cpu, prev_net, dt)
                 if metrics:
                     self.latest_metrics = metrics
@@ -553,9 +581,9 @@ class SSHSession:
                         prev_net = raw_net
                     prev_time = now_time
 
-                time.sleep(2.5)
+                time.sleep(3.5)
             except Exception:
-                time.sleep(3.0)
+                time.sleep(3.5)
 
     @staticmethod
     def _parse_metrics(raw: str, prev_cpu=None, prev_net=None, dt: float = 2.5) -> Dict[str, Any]:

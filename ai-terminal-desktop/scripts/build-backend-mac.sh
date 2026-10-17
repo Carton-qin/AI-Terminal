@@ -21,6 +21,13 @@ mkdir -p "$DESKTOP_DIR/backend-dist"
   --collect-all websockets \
   --collect-all paramiko \
   --collect-all cryptography \
+  --collect-all httpx \
+  --collect-all openai \
+  --collect-all pydantic \
+  --hidden-import httpx \
+  --hidden-import openai \
+  --hidden-import pydantic \
+  --hidden-import pydantic_core \
   --hidden-import ai_service \
   --hidden-import host_store \
   --hidden-import pty_session \

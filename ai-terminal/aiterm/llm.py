@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import Generator, List, Optional, Tuple
 
+import httpx
 from openai import OpenAI
 
 from aiterm.config import Config
@@ -178,7 +179,6 @@ class LLMClient:
         elif "User-Agent" not in default_headers:
             default_headers["User-Agent"] = "AI-Terminal/1.0"
 
-        import httpx
         http_client = httpx.Client(
             verify=False,
             timeout=float(self.config.timeout),

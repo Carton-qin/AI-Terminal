@@ -33,7 +33,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller fastapi uvicorn websockets paramiko cryptography
+          pip install pyinstaller fastapi uvicorn websockets paramiko cryptography httpx openai rich prompt_toolkit pydantic
           pip install -r ai-terminal/requirements.txt
 
       - name: Install Node dependencies
@@ -56,6 +56,13 @@ jobs:
             --collect-all websockets \
             --collect-all paramiko \
             --collect-all cryptography \
+            --collect-all httpx \
+            --collect-all openai \
+            --collect-all pydantic \
+            --hidden-import httpx \
+            --hidden-import openai \
+            --hidden-import pydantic \
+            --hidden-import pydantic_core \
             --hidden-import ai_service \
             --hidden-import host_store \
             --hidden-import pty_session \
@@ -110,7 +117,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller fastapi uvicorn websockets paramiko cryptography
+          pip install pyinstaller fastapi uvicorn websockets paramiko cryptography httpx openai rich prompt_toolkit pydantic
           pip install -r ai-terminal/requirements.txt
 
       - name: Install Node dependencies
@@ -134,6 +141,13 @@ jobs:
             --collect-all websockets `
             --collect-all paramiko `
             --collect-all cryptography `
+            --collect-all httpx `
+            --collect-all openai `
+            --collect-all pydantic `
+            --hidden-import httpx `
+            --hidden-import openai `
+            --hidden-import pydantic `
+            --hidden-import pydantic_core `
             --hidden-import ai_service `
             --hidden-import host_store `
             --hidden-import pty_session `

@@ -67,6 +67,7 @@ jobs:
           path: |
             ai-terminal-desktop/dist-electron/*.dmg
             ai-terminal-desktop/dist-electron/*.zip
+          if-no-files-found: error
 
       - name: Publish Release (on Tag)
         if: startsWith(github.ref, 'refs/tags/')
@@ -110,21 +111,12 @@ jobs:
           npm install
 
       - name: Build Windows Backend & App
-        shell: cmd
+        shell: pwsh
         run: |
           cd ai-terminal-desktop
-          cd frontend && npm run build && cd ..
-          if not exist "backend-dist" mkdir "backend-dist"
-          pyinstaller --noconfirm --onedir --name aiterm-backend ^
-            --paths backend ^
-            --paths ..\ai-terminal ^
-            --collect-all uvicorn ^
-            --collect-all fastapi ^
-            --collect-all paramiko ^
-            --collect-all cryptography ^
-            --add-data "frontend\dist;frontend/dist" ^
-            --distpath backend-dist ^
-            backend\app.py
+          npm run build:frontend
+          if (-not (Test-Path "backend-dist")) { New-Item -ItemType Directory -Path "backend-dist" }
+          pyinstaller --noconfirm --onedir --name aiterm-backend --paths backend --paths ../ai-terminal --collect-all uvicorn --collect-all fastapi --collect-all paramiko --collect-all cryptography --add-data "frontend/dist;frontend/dist" --distpath backend-dist backend/app.py
           npx electron-builder --win nsis portable zip
 
       - name: Upload Windows Artifacts
@@ -134,6 +126,7 @@ jobs:
           path: |
             ai-terminal-desktop/dist-electron/*.exe
             ai-terminal-desktop/dist-electron/*.zip
+          if-no-files-found: error
 
       - name: Publish Release (on Tag)
         if: startsWith(github.ref, 'refs/tags/')

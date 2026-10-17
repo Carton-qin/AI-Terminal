@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 引入 xterm 自定义暗色/浅色样式 */
+.xterm {
+  padding: 10px;
+  height: 100%;
+}
+
+/* 浅色模式 xterm 视口滚动条 */
+.xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+.xterm-viewport::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 深色模式 xterm 视口滚动条 */
+.dark .xterm-viewport::-webkit-scrollbar-track {
+  background: #161b22;
+}
+.dark .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #30363d;
+}
+.dark .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* 全局滚动条自适应 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #21262d;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #30363d;
+}

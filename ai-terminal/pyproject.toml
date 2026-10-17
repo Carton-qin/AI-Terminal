@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiterm"
+version = "0.1.0"
+description = "AI-powered intelligent interactive terminal assistant"
+authors = [
+    { name = "Gao Jia" }
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "prompt_toolkit>=3.0.40",
+    "rich>=13.7.0",
+    "openai>=1.20.0",
+    "pydantic>=2.5.0"
+]
+
+[project.scripts]
+aiterm = "aiterm.cli:main"
+ai = "aiterm.cli:main"

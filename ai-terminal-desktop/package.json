@@ -1,0 +1,60 @@
+{
+  "name": "ai-terminal-desktop",
+  "version": "1.0.0",
+  "description": "AI Terminal - 专为开发者与全栈运维打造的下一代智能终端",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend:mac": "bash scripts/build-backend-mac.sh",
+    "pack:mac": "electron-builder --mac",
+    "pack:win": "electron-builder --win",
+    "dist:mac": "npm run build:frontend && npm run build:backend:mac && electron-builder --mac dmg zip"
+  },
+  "build": {
+    "appId": "com.aiterminal.desktop",
+    "productName": "AI-Terminal",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend-dist/aiterm-backend",
+        "to": "backend"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "tree-kill": "^1.2.2"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  }
+}

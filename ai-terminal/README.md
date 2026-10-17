@@ -1,0 +1,195 @@
+# ⚡ AI Terminal (aiterm)
+
+> 基于 Python、Prompt Toolkit 与 Rich 打造的智能交互式命令行终端助手与运维 Agent。
+
+---
+
+## 🌟 核心特性
+
+- 🧠 **自然语言转命令**：输入日常自然语言（如 *“查找当前目录下大于50MB的文件按大小排序”*、*“查看80端口被谁占用”*），AI 结合当前操作系统（macOS / Debian / Ubuntu / CentOS 等）与环境信息，自动生成最地道、最精准的原生 Shell 命令。
+- 🛡️ **三级命令安全审计**：
+  - 🟢 **安全只读 (Safe)**：常规查询命令（`ls`, `ps`, `df`, `cat`, `git status` 等）。
+  - 🟡 **普通修改 (Moderate)**：文件创建与服务管理（`mkdir`, `touch`, `curl`, `pip install` 等）。
+  - 🔴 **高危拦截 (Dangerous)**：包含 `rm -rf /`、裸磁盘 `dd`、`mkfs`、系统 `chmod 777`、清空防火墙 `iptables -F` 等，红色警示并强制用户显式输入 `yes` 确认。
+- 🩺 **报错自动诊断与自愈**：当任何命令执行失败（退出码非 0）时，AI 自动捕获终端输出与 Exit Code，分析根本原因（如权限不足、依赖缺失、端口占用），并提供一键修复方案。
+- 🐚 **智能原生直通 & 目录同步**：
+  - 纯 Linux/Unix 命令（如 `cd ..`, `ls -lh`, `top`）无需经过大模型，零延迟直接在系统终端中原生执行。
+  - 完美解决 Python 子进程执行 `cd` 无法改变父进程目录的痛点，支持 `cd ~`、`cd -` 及路径实时同步。
+  - 前缀加 `!` 可强制绕过 AI 直通 Shell。
+- 📖 **参数深入拆解 (`?`)**：在确认执行前输入 `?`，AI 将逐条拆解该命令的每一个参数（Flags）和子命令的作用。
+- 🔄 **会话上下文与多轮对话**：支持带记忆的连续指令交互（例如先查找，再输入 *“把刚才的文件压缩成 tar.gz”*）。
+- 🔌 **全生态大模型兼容**：兼容标准 OpenAI 接口规范，开箱即用支持 **DeepSeek**、**OpenAI**、**本地离线 Ollama (零成本免Key)**、**Moonshot / Kimi**、**阿里云通义千问** 等。
+
+---
+
+## 📦 安装与快速开始
+
+### 1. 运行依赖
+- Python 3.9 及以上版本
+
+### 2. 快速启动（推荐）
+
+直接运行项目内置的便携启动脚本：
+
+```bash
+# 进入目录
+cd ai-terminal
+
+# 启动交互式 AI Terminal
+./run.sh
+```
+
+### 3. 安装为系统全局命令 (`aiterm` / `ai`)
+
+```bash
+cd ai-terminal
+pip install -e .
+```
+安装完成后，在系统的任何目录直接输入 `aiterm` 即可启动，或使用快捷别名 `ai`。
+
+---
+
+## ⚙️ 模型配置指南
+
+第一次启动时，系统会自动引导你进行配置。你也可以在任何时候通过以下方式调整：
+
+### 方式 A：交互式向导
+```bash
+./run.sh --config
+# 或者在进入 aiterm 终端后输入：
+/config
+```
+
+### 方式 B：环境变量
+你可以在 `~/.bashrc` 或 `~/.zshrc` 中添加环境变量：
+```bash
+export AITERM_API_KEY="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+export AITERM_BASE_URL="https://api.deepseek.com/v1"
+export AITERM_MODEL="deepseek-chat"
+```
+
+### 方式 C：配置文件 (`~/.aiterm/config.json`)
+```json
+{
+  "api_key": "sk-your-key-here",
+  "base_url": "https://api.deepseek.com/v1",
+  "model": "deepseek-chat",
+  "temperature": 0.2,
+  "timeout": 60,
+  "auto_execute_safe": false,
+  "language": "zh"
+}
+```
+
+#### 常见大模型服务商配置参考：
+| 服务商 | Base URL | 推荐模型名 | 备注 |
+| :--- | :--- | :--- | :--- |
+| **DeepSeek** (推荐) | `https://api.deepseek.com/v1` | `deepseek-chat` | 综合性价比极高 |
+| **Ollama** (本地离线) | `http://localhost:11434/v1` | `qwen2.5:7b` | **完全免费、无需 API Key、私密安全** |
+| **OpenAI** | `https://api.openai.com/v1` | `gpt-4o` | 支持官方或各类反代网关 |
+| **通义千问 (DashScope)** | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | 兼容接口 |
+| **Moonshot (Kimi)** | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` | 长文本与中文理解好 |
+
+---
+
+## 🚀 使用指南
+
+### 1. 全功能交互式终端模式 (REPL)
+
+```bash
+./run.sh
+```
+
+进入后提示符呈现：
+```
+╭─[gaojia@darwin: ~/Documents/VPS-manage]
+╰─➤ 
+```
+
+#### 场景 1：输入自然语言，自动生成命令并确认
+```
+╰─➤ 找出当前目录下修改时间在3天以内的所有 .sh 文件
+```
+AI 将生成带有语法高亮的命令卡片与参数说明：
+```
+╭─ 💡 AI 建议命令 [🟢 安全 (Read-only)] ──────────────────────────────╮
+│ find . -type f -name "*.sh" -mtime -3                               │
+╰─────────────────────────────────────────────────────────────────────╯
+📖 说明: 查找当前目录及其子目录中，文件名以 .sh 结尾且在最近 3 天内修改过的文件。
+[Enter/Y 执行] [e 编辑] [? 详解参数] [c/n 取消]: 
+```
+- 直接按 **Enter** 或 **Y**：立即执行。
+- 输入 **e**：将命令载入编辑栏，支持光标自由修改后再执行。
+- 输入 **?**：AI 逐个解释每个参数的含义（如 `-type f` 代表什么，`-mtime -3` 代表什么）。
+- 输入 **c** 或 **n**：放弃执行。
+
+#### 场景 2：原生命令秒级直通 & 目录跳转
+可以直接当做常规终端使用：
+```
+╰─➤ ls -la
+╰─➤ cd ..
+╰─➤ git status
+```
+
+#### 场景 3：报错自动自愈
+若命令执行出错（例如缺少权限或端口被占用）：
+```
+╰─➤ apt update
+...
+E: Could not open lock file /var/lib/apt/lists/lock - open (13: Permission denied)
+❌ 命令执行出错，是否让 AI 诊断原因并提供修复命令？ [Y/n]: y
+```
+AI 将自动给出诊断：
+```
+╭─ 🩺 异常智能诊断 ───────────────────────────────────────────────────╮
+│ ❌ 命令执行失败 (退出码: 100): apt update                            │
+│                                                                     │
+│ 🔍 根本原因: 更新 apt 软件索引需要管理员特权，普通用户无写入权限。   │
+│                                                                     │
+│ 🛠️ 推荐修复命令: [🟡 修改 (Moderate)]                               │
+│ sudo apt update                                                     │
+│ 📖 修复说明: 使用 sudo 提升为 root 管理员权限执行更新。              │
+╰─────────────────────────────────────────────────────────────────────╯
+是否立即执行修复命令？ [Enter/Y 执行, e 编辑, c 放弃]:
+```
+
+---
+
+### 2. 单次快捷转译模式 (One-shot)
+
+如果你在平时的 bash/zsh 终端里临时想查一个命令，可以直接使用单次模式：
+
+```bash
+# 生成并提示是否运行
+./run.sh "检查系统 CPU 与内存当前占用最高的前5个进程"
+
+# 对安全命令自动执行无需按确认 (-y)
+./run.sh -y "查看本机公网IP"
+```
+
+---
+
+## 🛠️ 终端内内置指令 (Slash Commands)
+
+在 `aiterm` 提示符下随时输入以下斜杠命令：
+
+| 命令 | 说明 |
+| :--- | :--- |
+| `/help` | 查看详细帮助指令与快捷键速查 |
+| `/config` | 打开交互式配置向导修改 API Key 或模型 |
+| `/model [名称]` | 快速查看或切换当前使用的大模型 |
+| `/context` | 查看当前终端探测到的系统与硬件上下文环境 |
+| `/clear` | 清屏 |
+| `/reset` | 重置会话上下文记忆 |
+| `exit` / `quit` | 退出终端 (也可直接按 `Ctrl+D`) |
+
+---
+
+## 🧪 自动化测试
+
+运行内置的自动化单元测试：
+
+```bash
+PYTHONPATH="." python3 -m unittest discover -s tests -v
+```
+包含了针对命令安全等级分析（高危/中危/安全）、目录追踪同步（`cd`）、系统探针与执行引擎的完整测试用例。

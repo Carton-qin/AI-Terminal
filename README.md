@@ -86,13 +86,23 @@
 
 ### 🍎 macOS
 - **DMG 安装镜像（推荐，双击拖拽安装）**：
-  👉 前往 [Releases 页面](https://github.com/Carton-qin/AI-Terminal/releases) 或 [Actions Artifacts](https://github.com/Carton-qin/AI-Terminal/actions) 下载 `AI-Terminal-1.0.0-arm64.dmg`
-- **免安装绿色压缩包**：下载 `AI-Terminal-1.0.0-arm64-mac.zip`，解压即用。
+  👉 前往 [Releases 页面](https://github.com/Carton-qin/AI-Terminal/releases) 下载 `AI-Terminal-1.0.2-arm64.dmg`
+- **免安装绿色压缩包**：下载 `AI-Terminal-1.0.2-arm64-mac.zip`，解压即用。
+
+> [!TIP]
+> **macOS 首次打开提示「“AI-Terminal”已损坏，无法打开」？**  
+> 这是 macOS 对未购买苹果 99 美元/年开发者公证证书的开源软件的默认安全拦截（非真实损坏）。只需打开系统自带的「终端」（Terminal）执行以下命令解除拦截即可正常秒开：
+> ```bash
+> xattr -cr /Applications/AI-Terminal.app
+> ```
+> *(若文件仍在“下载”文件夹中，执行 `xattr -cr ~/Downloads/AI-Terminal.app`)*
 
 ### 🪟 Windows
 - **NSIS 安装向导程序**：
-  👉 前往 [Releases 页面](https://github.com/Carton-qin/AI-Terminal/releases) 或 [Actions Artifacts](https://github.com/Carton-qin/AI-Terminal/actions) 下载 `AI-Terminal-Setup-1.0.0.exe`
-- **绿色便携免安装版**：下载 `AI-Terminal-1.0.0-win.zip`，解压后双击 `AI-Terminal.exe` 即可运行。
+  👉 前往 [Releases 页面](https://github.com/Carton-qin/AI-Terminal/releases) 下载 `AI-Terminal.Setup.1.0.2.exe`
+- **便携免安装单文件**：下载 `AI-Terminal.1.0.2.exe`，直接双击运行。
+- **绿色便携压缩包**：下载 `AI-Terminal-1.0.2-win.zip`，解压后双击 `AI-Terminal.exe` 即可运行。
+
 
 ---
 

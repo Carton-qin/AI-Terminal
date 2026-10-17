@@ -18,8 +18,18 @@ mkdir -p "$DESKTOP_DIR/backend-dist"
   --paths "$ROOT_DIR/ai-terminal" \
   --collect-all uvicorn \
   --collect-all fastapi \
+  --collect-all websockets \
   --collect-all paramiko \
   --collect-all cryptography \
+  --hidden-import ai_service \
+  --hidden-import host_store \
+  --hidden-import pty_session \
+  --hidden-import ssh_session \
+  --hidden-import aiterm \
+  --hidden-import aiterm.config \
+  --hidden-import aiterm.context \
+  --hidden-import aiterm.llm \
+  --hidden-import aiterm.safety \
   --add-data "$DESKTOP_DIR/frontend/dist:frontend/dist" \
   --distpath "$DESKTOP_DIR/backend-dist" \
   --workpath "$ROOT_DIR/build/pyinstaller/build" \

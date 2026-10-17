@@ -36,6 +36,18 @@ ai_service = AIService()
 active_sessions: Dict[str, Any] = {}
 
 
+# --- 轻量探针路由 (毫秒级响应，无需访问数据库，供 Electron 启动探活) ---
+@app.get("/health")
+@app.get("/api/health")
+def health_probe():
+    return {
+        "status": "ok",
+        "app": "AI Terminal Desktop",
+        "version": "1.0.0",
+        "platform": sys.platform,
+    }
+
+
 # --- 数据模型 ---
 class HostCreateRequest(BaseModel):
     name: str
@@ -993,18 +1005,28 @@ from fastapi.responses import FileResponse
 import sys
 
 if getattr(sys, "frozen", False):
-    base_dir = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
-    candidate_dist = base_dir / "frontend" / "dist"
-    if not candidate_dist.exists():
-        candidate_dist = base_dir / "_internal" / "frontend" / "dist"
-    DIST_DIR = candidate_dist
+    exe_dir = Path(sys.executable).resolve().parent
+    meipass_dir = Path(getattr(sys, "_MEIPASS", exe_dir))
+    candidates = [
+        meipass_dir / "frontend" / "dist",
+        meipass_dir / "_internal" / "frontend" / "dist",
+        exe_dir / "frontend" / "dist",
+        exe_dir / "_internal" / "frontend" / "dist",
+        exe_dir.parent / "frontend" / "dist",
+        exe_dir.parent / "Resources" / "backend" / "_internal" / "frontend" / "dist",
+        Path.cwd() / "frontend" / "dist",
+    ]
+    DIST_DIR = next((p for p in candidates if p.exists()), candidates[0])
 else:
     DIST_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 if DIST_DIR.exists():
     assets_dir = DIST_DIR / "assets"
     if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+        try:
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+        except Exception as e:
+            print(f"[Warning] Failed to mount /assets: {e}")
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
@@ -1017,6 +1039,16 @@ if DIST_DIR.exists():
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8765)
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8765,
+        log_level="info",
+        loop="asyncio",
+        http="h11",
+    )
+
 

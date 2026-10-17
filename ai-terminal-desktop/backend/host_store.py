@@ -104,8 +104,13 @@ class HostStore:
 
     def _get_conn(self) -> sqlite3.Connection:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(self.db_path))
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA busy_timeout=5000;")
+        except Exception:
+            pass
         return conn
 
     def _init_db(self):
@@ -182,12 +187,26 @@ class HostStore:
                     (f"grp-{uuid.uuid4().hex[:8]}", row[0])
                 )
             conn.commit()
+
+        # 确保初始连接关闭后再同步预置片段和模型档案，避免 SQLite 文件锁冲突
+        try:
             self.sync_community_snippets()
+        except Exception as e:
+            print(f"[Warning] 同步社区脚本片段失败: {e}")
+
+        try:
             self._seed_default_profiles()
+        except Exception as e:
+            print(f"[Warning] 初始化默认 AI 配置失败: {e}")
 
     def sync_community_snippets(self):
         """导入或更新全面的 NodeSeek 社区 VPS 运维与跑分脚本（UPSERT 模式，绝不覆盖用户自定义脚本）"""
-        optimize_path = Path("/Users/gaojia/Documents/VPS-manage/optimize.sh")
+        candidate_paths = [
+            Path(__file__).resolve().parent.parent.parent / "optimize.sh",
+            Path.cwd() / "optimize.sh",
+            get_storage_dir() / "optimize.sh",
+        ]
+        optimize_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
         opt_content = ""
         if optimize_path.exists():
             try:

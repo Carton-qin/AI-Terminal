@@ -53,8 +53,18 @@ jobs:
             --paths ../ai-terminal \
             --collect-all uvicorn \
             --collect-all fastapi \
+            --collect-all websockets \
             --collect-all paramiko \
             --collect-all cryptography \
+            --hidden-import ai_service \
+            --hidden-import host_store \
+            --hidden-import pty_session \
+            --hidden-import ssh_session \
+            --hidden-import aiterm \
+            --hidden-import aiterm.config \
+            --hidden-import aiterm.context \
+            --hidden-import aiterm.llm \
+            --hidden-import aiterm.safety \
             --add-data "frontend/dist:frontend/dist" \
             --distpath backend-dist \
             backend/app.py
@@ -116,7 +126,26 @@ jobs:
           cd ai-terminal-desktop
           npm run build:frontend
           if (-not (Test-Path "backend-dist")) { New-Item -ItemType Directory -Path "backend-dist" }
-          pyinstaller --noconfirm --onedir --name aiterm-backend --paths backend --paths ../ai-terminal --collect-all uvicorn --collect-all fastapi --collect-all paramiko --collect-all cryptography --add-data "frontend/dist;frontend/dist" --distpath backend-dist backend/app.py
+          pyinstaller --noconfirm --onedir --name aiterm-backend `
+            --paths backend `
+            --paths ../ai-terminal `
+            --collect-all uvicorn `
+            --collect-all fastapi `
+            --collect-all websockets `
+            --collect-all paramiko `
+            --collect-all cryptography `
+            --hidden-import ai_service `
+            --hidden-import host_store `
+            --hidden-import pty_session `
+            --hidden-import ssh_session `
+            --hidden-import aiterm `
+            --hidden-import aiterm.config `
+            --hidden-import aiterm.context `
+            --hidden-import aiterm.llm `
+            --hidden-import aiterm.safety `
+            --add-data "frontend/dist;frontend/dist" `
+            --distpath backend-dist `
+            backend/app.py
           npx electron-builder --win nsis portable zip
 
       - name: Upload Windows Artifacts

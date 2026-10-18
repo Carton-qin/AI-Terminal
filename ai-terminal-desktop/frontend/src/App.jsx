@@ -522,14 +522,7 @@ export default function App() {
           if (activeTabId) {
             setTabChats((prev) => ({
               ...prev,
-              [activeTabId]: [
-                {
-                  id: 'reset-' + Date.now(),
-                  userQuery: '新会话',
-                  isCommand: false,
-                  explanation: '当前会话对话已重置。AI Copilot 已准备就绪。',
-                },
-              ],
+              [activeTabId]: [],
             }))
           }
         }}
@@ -537,14 +530,7 @@ export default function App() {
           if (activeTabId) {
             setTabChats((prev) => ({
               ...prev,
-              [activeTabId]: [
-                {
-                  id: 'reset-' + Date.now(),
-                  userQuery: '新会话',
-                  isCommand: false,
-                  explanation: '当前会话对话已重置。AI Copilot 已准备就绪。',
-                },
-              ],
+              [activeTabId]: [],
             }))
           }
         }}

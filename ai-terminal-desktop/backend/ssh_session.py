@@ -58,12 +58,60 @@ class SSHSession:
                 except Exception:
                     pass
 
+        target_host = self.host.strip() if isinstance(self.host, str) else str(self.host)
+        target_port = int(self.port) if self.port else 22
+
+        # 预先建立底层 TCP Socket 直连并进行系统级诊断 (直接探测 IPv4 / IPv6，暴露精准的 macOS 权限/超时异常)
+        sock = None
+        last_sock_err = None
+        for family in (socket.AF_INET, socket.AF_INET6):
+            try:
+                s = socket.socket(family, socket.SOCK_STREAM)
+                s.settimeout(10.0)
+                s.connect((target_host, target_port))
+                sock = s
+                break
+            except Exception as e:
+                last_sock_err = e
+                try:
+                    s.close()
+                except Exception:
+                    pass
+
+        if sock is None and last_sock_err is not None:
+            err_msg = str(last_sock_err)
+            err_no = getattr(last_sock_err, 'errno', None)
+            if "Operation not permitted" in err_msg or err_no == 1:
+                raise ConnectionError(
+                    f"macOS 系统权限拦截: 无法访问局域网目标 {target_host}:{target_port}。\n"
+                    f"原因: macOS 15+ 拦截了应用程序访问局域网私有 IP。\n"
+                    f"解决办法: 请在 Mac「系统设置 -> 隐私与安全性 -> 本地网络」中，将 AI-Terminal 的开关打开即可！"
+                )
+            elif "timed out" in err_msg or err_no == 60:
+                raise ConnectionError(
+                    f"连接目标主机 {target_host}:{target_port} 超时。\n"
+                    f"排查建议: 1. 请检查 Mac 是否与 NAS 处于同一 Wi-Fi 主路由器下；2. 请检查路由器后台是否开启了「AP 隔离/客户端隔离」。"
+                )
+            elif "Connection refused" in err_msg or err_no == 61:
+                raise ConnectionError(
+                    f"目标主机 {target_host}:{target_port} 拒绝连接。\n"
+                    f"排查建议: 请登录飞牛控制台，检查「终端与 SSH」服务是否已开启，并确认端口号是否为 {target_port}。"
+                )
+            elif "No route to host" in err_msg or err_no == 65:
+                raise ConnectionError(
+                    f"无法找到目标网段路由 {target_host}:{target_port}。\n"
+                    f"排查建议: Mac 当前连接的网络与目标主机不在同一网段，请检查 Wi-Fi 网络设置。"
+                )
+            else:
+                raise ConnectionError(f"底层 TCP 连接到 {target_host}:{target_port} 失败: {last_sock_err}")
+
         self.client.connect(
-            hostname=self.host.strip() if isinstance(self.host, str) else self.host,
-            port=int(self.port) if self.port else 22,
+            hostname=target_host,
+            port=target_port,
             username=self.username.strip() if isinstance(self.username, str) else self.username,
             password=self.password if not pkey else None,
             pkey=pkey,
+            sock=sock,
             timeout=15,
             banner_timeout=30,
             look_for_keys=(pkey is not None),

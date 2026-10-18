@@ -22,7 +22,10 @@ import {
   Bot,
   ArrowRight,
   ShieldCheck,
+  Plus,
+  Terminal,
 } from 'lucide-react'
+import MarkdownRenderer from './MarkdownRenderer'
 
 // 判定终端当前末行是否为命令行提示符 (Prompt)
 const isPromptLine = (line) => {
@@ -55,6 +58,19 @@ export default function AICopilot({
   const targetTab = currentTab || activeTab
   const targetCards = (chatCards && chatCards.length ? chatCards : chatMessages) || []
   const handleClearChat = onClearChat || onResetSession
+
+  // 新建全新对话 / 清空当前问答历史
+  const handleNewChat = () => {
+    if (onClearChat) {
+      onClearChat()
+    } else if (onResetSession) {
+      onResetSession()
+    } else if (onUpdateChat) {
+      onUpdateChat([])
+    }
+    setQuery('')
+    setLoading(false)
+  }
 
   const [activeSubTab, setActiveSubTab] = useState('chat') // 'chat' | 'diagnose'
   const [query, setQuery] = useState('')
@@ -791,7 +807,7 @@ export default function AICopilot({
           </span>
         </div>
 
-        <div className="flex items-center space-x-1 shrink-0">
+        <div className="flex items-center space-x-1.5 shrink-0">
           {/* ⚡ 自动执行开关联动 */}
           <button
             onClick={onToggleAutoExecute}
@@ -810,9 +826,19 @@ export default function AICopilot({
             <span>自执行 {autoExecute ? 'ON' : 'OFF'}</span>
           </button>
 
+          {/* ✨ 显眼的新建对话按钮 */}
+          <button
+            onClick={handleNewChat}
+            className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-xs"
+            title="开启全新对话，清空当前问答历史与上下文"
+          >
+            <Plus size={11} />
+            <span>新对话</span>
+          </button>
+
           {/* 🗑️ 清空当前 Tab 记忆 */}
           <button
-            onClick={handleClearChat}
+            onClick={handleNewChat}
             className="p-1 text-slate-400 hover:text-rose-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-slate-200 dark:hover:bg-[#21262d] rounded transition"
             title="清空当前会话的 AI 对话记录"
           >
@@ -909,6 +935,56 @@ export default function AICopilot({
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* 卡片流 */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {targetCards.length > 0 && (
+              <div className="flex items-center justify-between px-1 text-[10px] text-slate-400 dark:text-gray-500 pb-1 border-b border-slate-200/60 dark:border-[#21262d]">
+                <span>共 {targetCards.length} 轮问答记录</span>
+                <button
+                  onClick={handleNewChat}
+                  className="hover:text-rose-500 dark:hover:text-red-400 flex items-center space-x-1 transition font-medium"
+                >
+                  <Trash2 size={10} />
+                  <span>清空所有记录</span>
+                </button>
+              </div>
+            )}
+
+            {targetCards.length === 0 && (
+              <div className="h-full min-h-[320px] flex flex-col items-center justify-center p-4 text-center space-y-3 select-none">
+                <div className="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-950/60 border border-cyan-300 dark:border-cyan-800 flex items-center justify-center text-cyan-600 dark:text-cyan-400 shadow-xs">
+                  <Sparkles size={20} />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-slate-800 dark:text-gray-200">
+                    AI Copilot 智能运维助手
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-gray-400 max-w-xs leading-normal">
+                    已实时关联当前终端屏幕，可直接询问故障排查、命令生成或命令含义
+                  </div>
+                </div>
+
+                <div className="w-full max-w-xs space-y-1.5 pt-2 text-left">
+                  <div className="text-[10px] font-medium text-slate-400 dark:text-gray-500 px-1">
+                    💡 常用快捷提问：
+                  </div>
+                  {[
+                    { text: '排查当前 80 与 443 端口被谁占用', q: '排查当前 80 与 443 端口被谁占用' },
+                    { text: '检查系统 CPU、内存与磁盘大文件占用', q: '检查系统 CPU、内存与大文件磁盘占用' },
+                    { text: '读取当前终端屏幕上的报错并给出解决办法', q: '请读取当前终端屏幕上的报错并给出解决方案' },
+                    { text: '检查当前防火墙开放端口与安全规则', q: '检查当前系统防火墙状态并列出放行端口' },
+                  ].map((item, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(null, item.q)}
+                      className="w-full text-left p-2 rounded-lg bg-slate-100/80 hover:bg-slate-200/80 dark:bg-[#161b22] dark:hover:bg-[#21262d] border border-slate-200/80 dark:border-[#30363d] text-[11px] text-slate-700 dark:text-gray-300 transition flex items-center justify-between group"
+                    >
+                      <span className="truncate pr-1">{item.text}</span>
+                      <ArrowRight size={11} className="text-slate-400 dark:text-gray-500 group-hover:text-cyan-500 shrink-0 transition" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {targetCards.map((card) => (
               <div
                 key={card.id}
@@ -945,14 +1021,36 @@ export default function AICopilot({
 
                 {/* 生成的代码块 */}
                 {card.isCommand && card.command && (
-                  <div className="bg-slate-100 dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded p-2 font-mono text-[11px] text-cyan-800 dark:text-cyan-300 break-all relative group">
-                    <div>{card.command}</div>
+                  <div className="bg-slate-900 border border-slate-700/80 dark:border-[#30363d] rounded-lg p-2.5 font-mono text-[11px] text-cyan-300 break-all relative group shadow-xs select-text">
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1.5 pb-1 border-b border-gray-800">
+                      <span className="text-cyan-400 font-semibold uppercase tracking-wider flex items-center space-x-1">
+                        <Terminal size={11} />
+                        <span>建议执行命令</span>
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(card.command, card.id)}
+                        className="hover:text-gray-200 flex items-center space-x-1 text-gray-400 transition"
+                      >
+                        {copiedId === card.id ? (
+                          <Check size={11} className="text-emerald-400" />
+                        ) : (
+                          <Copy size={11} />
+                        )}
+                        <span>{copiedId === card.id ? '已复制' : '复制'}</span>
+                      </button>
+                    </div>
+                    <div className="whitespace-pre-wrap leading-relaxed">{card.command}</div>
                   </div>
                 )}
 
-                {/* 命令参数简要说明 */}
+                {/* 命令参数简要说明 / AI 深度解答 (Markdown 格式化) */}
                 {card.explanation && (
-                  <div className="text-slate-600 dark:text-gray-400 leading-relaxed text-[11px]">{card.explanation}</div>
+                  <div className="bg-white/80 dark:bg-[#161b22]/70 border border-slate-200 dark:border-[#21262d] rounded-lg p-2.5 shadow-xs">
+                    <MarkdownRenderer
+                      content={card.explanation}
+                      onInjectCommand={onInjectCommand}
+                    />
+                  </div>
                 )}
 
                 {/* ✨ 重点：终端实际执行结果与 AI 深度答复 */}
@@ -977,7 +1075,7 @@ export default function AICopilot({
                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#30363d] pb-1">
                       <div className="flex items-center space-x-1.5 font-semibold text-cyan-700 dark:text-cyan-300 text-[11px]">
                         <Sparkles size={13} className="text-cyan-500 dark:text-cyan-400 shrink-0" />
-                        <span>AI 结论答复</span>
+                        <span>AI 终端输出解读</span>
                       </div>
                       <button
                         onClick={() => analyzeOutputForCard(card)}
@@ -989,9 +1087,10 @@ export default function AICopilot({
                         <span>重新解读</span>
                       </button>
                     </div>
-                    <div className="text-slate-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap text-[11px]">
-                      {card.resultAnswer}
-                    </div>
+                    <MarkdownRenderer
+                      content={card.resultAnswer}
+                      onInjectCommand={onInjectCommand}
+                    />
                   </div>
                 )}
 

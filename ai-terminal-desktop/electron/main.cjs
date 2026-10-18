@@ -476,14 +476,32 @@ async function launchSequence() {
       updateSplashStatus(status)
     })
 
-    // 后端就绪，平滑加载实际 SPA 应用
+    // 后端就绪，清空旧缓存并平滑加载实际 SPA 应用
     if (mainWindow && !mainWindow.isDestroyed()) {
       appendLog(`加载主界面 URL: http://127.0.0.1:${BACKEND_PORT}`)
-      mainWindow.loadURL(`http://127.0.0.1:${BACKEND_PORT}`).catch((err) => {
+      try {
+        await mainWindow.webContents.session.clearCache()
+      } catch (e) {}
+
+      mainWindow.webContents.on('before-input-event', (event, input) => {
+        if ((input.control || input.meta) && input.key.toLowerCase() === 'r') {
+          mainWindow.webContents.session.clearCache().then(() => {
+            mainWindow.loadURL(`http://127.0.0.1:${BACKEND_PORT}`, {
+              extraHeaders: 'pragma: no-cache\ncache-control: no-cache\n',
+            })
+          })
+        }
+      })
+
+      mainWindow.loadURL(`http://127.0.0.1:${BACKEND_PORT}`, {
+        extraHeaders: 'pragma: no-cache\ncache-control: no-cache\n',
+      }).catch((err) => {
         appendLog(`loadURL 遇到异常，1 秒后重试: ${err.message}`)
         setTimeout(() => {
           if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.loadURL(`http://127.0.0.1:${BACKEND_PORT}`)
+            mainWindow.loadURL(`http://127.0.0.1:${BACKEND_PORT}`, {
+              extraHeaders: 'pragma: no-cache\ncache-control: no-cache\n',
+            })
           }
         }, 1000)
       })

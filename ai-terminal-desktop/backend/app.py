@@ -1063,9 +1063,16 @@ if DIST_DIR.exists():
         if full_path.startswith("api/") or full_path.startswith("ws/"):
             raise HTTPException(status_code=404, detail="Not Found")
         target_file = DIST_DIR / full_path
+        no_cache_headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
         if target_file.is_file():
+            if target_file.name == "index.html" or not full_path.startswith("assets/"):
+                return FileResponse(target_file, headers=no_cache_headers)
             return FileResponse(target_file)
-        return FileResponse(DIST_DIR / "index.html")
+        return FileResponse(DIST_DIR / "index.html", headers=no_cache_headers)
 
 
 if __name__ == "__main__":

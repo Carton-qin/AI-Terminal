@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import io
+import platform
+import socket
 import threading
+import time
 from typing import Any, Dict, List, Optional
 import paramiko
 
@@ -81,26 +84,28 @@ class SSHSession:
         if sock is None and last_sock_err is not None:
             err_msg = str(last_sock_err)
             err_no = getattr(last_sock_err, 'errno', None)
-            if "Operation not permitted" in err_msg or err_no == 1:
+            is_mac = platform.system() == "Darwin"
+
+            if ("Operation not permitted" in err_msg or err_no == 1) and is_mac:
                 raise ConnectionError(
                     f"macOS 系统权限拦截: 无法访问局域网目标 {target_host}:{target_port}。\n"
                     f"原因: macOS 15+ 拦截了应用程序访问局域网私有 IP。\n"
                     f"解决办法: 请在 Mac「系统设置 -> 隐私与安全性 -> 本地网络」中，将 AI-Terminal 的开关打开即可！"
                 )
-            elif "timed out" in err_msg or err_no == 60:
+            elif "timed out" in err_msg.lower() or err_no in (60, 110, 10060):
                 raise ConnectionError(
                     f"连接目标主机 {target_host}:{target_port} 超时。\n"
-                    f"排查建议: 1. 请检查 Mac 是否与 NAS 处于同一 Wi-Fi 主路由器下；2. 请检查路由器后台是否开启了「AP 隔离/客户端隔离」。"
+                    f"排查建议: 1. 请检查本机与 NAS 是否在同一路由器局域网下；2. 请检查路由器是否开启了「AP 隔离/客户端隔离」；3. 确认 NAS 的 IP 地址未变动。"
                 )
-            elif "Connection refused" in err_msg or err_no == 61:
+            elif "refused" in err_msg.lower() or err_no in (61, 111, 10061):
                 raise ConnectionError(
                     f"目标主机 {target_host}:{target_port} 拒绝连接。\n"
                     f"排查建议: 请登录飞牛控制台，检查「终端与 SSH」服务是否已开启，并确认端口号是否为 {target_port}。"
                 )
-            elif "No route to host" in err_msg or err_no == 65:
+            elif "no route" in err_msg.lower() or err_no in (65, 113, 10065):
                 raise ConnectionError(
                     f"无法找到目标网段路由 {target_host}:{target_port}。\n"
-                    f"排查建议: Mac 当前连接的网络与目标主机不在同一网段，请检查 Wi-Fi 网络设置。"
+                    f"排查建议: 本机当前连接的网络与目标主机不在同一网段，请检查网络连接。"
                 )
             else:
                 raise ConnectionError(f"底层 TCP 连接到 {target_host}:{target_port} 失败: {last_sock_err}")
@@ -120,7 +125,6 @@ class SSHSession:
 
         # 启用 TCP_NODELAY，禁用 Nagle 缓冲算法，消除 40~200ms 交互延迟
         try:
-            import socket
             transport = self.client.get_transport()
             if transport and hasattr(transport, "sock") and transport.sock:
                 transport.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)

@@ -86,133 +86,122 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
   const diskColorClass = getPercentColor(diskPercent)
 
   return (
-    <div className="bg-white/95 dark:bg-[#0b0e14]/95 border-b border-slate-200 dark:border-[#30363d]/80 text-xs select-none backdrop-blur-md transition-colors shrink-0 text-slate-700 dark:text-gray-300">
-      {/* 1. 紧凑单行状态栏 (默认) */}
-      <div className="h-9 px-3 flex items-center justify-between space-x-3 overflow-x-auto text-[11px]">
-        {/* 左侧：主机标识与心跳 */}
-        <div className="flex items-center space-x-1.5 shrink-0 pr-1 border-r border-slate-200 dark:border-white/10">
-          <Radio size={12} className="text-emerald-500 dark:text-emerald-400 animate-pulse" />
-          <span className="font-semibold text-slate-800 dark:text-gray-200">
-            {activeTab.type === 'ssh' ? 'VPS 监控' : '本地监控'}
+    <div className="bg-slate-50/95 dark:bg-[#12161f]/95 border-b border-slate-200/80 dark:border-[#30363d]/80 text-xs select-none backdrop-blur-md transition-colors shrink-0 text-slate-700 dark:text-gray-300">
+      {/* 1. 精致胶囊式紧凑状态栏 */}
+      <div className="h-8 px-3 flex items-center justify-between space-x-2 overflow-x-auto text-[11px] no-scrollbar">
+        {/* 左侧：主机标识 */}
+        <div className="flex items-center space-x-1.5 shrink-0 pr-2 border-r border-slate-200 dark:border-white/10">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span className="font-semibold text-slate-800 dark:text-gray-200 text-xs">
+            {activeTab.type === 'ssh' ? 'VPS 监控' : '系统监控'}
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono">2.5s</span>
         </div>
 
         {/* 中间指标条目 */}
-        <div className="flex items-center space-x-4 min-w-0 flex-1 overflow-x-auto py-0.5">
+        <div className="flex items-center space-x-2 min-w-0 flex-1 overflow-x-auto py-0.5 no-scrollbar">
           {/* CPU */}
           <div
-            className="flex items-center space-x-1.5 shrink-0 cursor-default"
+            className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shrink-0 shadow-2xs"
             title={`CPU 实时使用率: ${cpuPercent}% (${cpuCores} 核心)`}
           >
-            <div className="flex items-center space-x-1 text-slate-500 dark:text-gray-400">
-              <Cpu size={12} className={cpuColorClass.split(' ')[0]} />
-              <span>CPU</span>
-            </div>
-            <div className="w-14 h-1.5 bg-slate-200 dark:bg-[#1f242c] rounded-full overflow-hidden shrink-0">
+            <Cpu size={12} className={cpuColorClass.split(' ')[0]} />
+            <span className="text-slate-500 dark:text-gray-400 font-medium text-[10px]">CPU</span>
+            <div className="w-10 h-1.5 bg-slate-200/80 dark:bg-white/10 rounded-full overflow-hidden shrink-0">
               <div
                 className={`h-full transition-all duration-500 ${cpuColorClass.split(' ')[1]}`}
                 style={{ width: `${Math.min(100, Math.max(0, cpuPercent))}%` }}
               ></div>
             </div>
-            <span className={`font-mono font-medium ${cpuColorClass.split(' ')[0]}`}>
+            <span className={`font-mono font-bold text-[11px] ${cpuColorClass.split(' ')[0]}`}>
               {cpuPercent}%
             </span>
           </div>
 
           {/* 内存 */}
           <div
-            className="flex items-center space-x-1.5 shrink-0 cursor-default"
+            className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shrink-0 shadow-2xs"
             title={`物理内存: ${memUsed} / ${memTotal} (${memPercent}%)`}
           >
-            <div className="flex items-center space-x-1 text-slate-500 dark:text-gray-400">
-              <Layers size={12} className={memColorClass.split(' ')[0]} />
-              <span>内存</span>
-            </div>
-            <div className="w-14 h-1.5 bg-slate-200 dark:bg-[#1f242c] rounded-full overflow-hidden shrink-0">
+            <Layers size={12} className={memColorClass.split(' ')[0]} />
+            <span className="text-slate-500 dark:text-gray-400 font-medium text-[10px]">内存</span>
+            <div className="w-10 h-1.5 bg-slate-200/80 dark:bg-white/10 rounded-full overflow-hidden shrink-0">
               <div
                 className={`h-full transition-all duration-500 ${memColorClass.split(' ')[1]}`}
                 style={{ width: `${Math.min(100, Math.max(0, memPercent))}%` }}
               ></div>
             </div>
-            <span className="font-mono text-slate-700 dark:text-gray-300">
-              {memUsed}/{memTotal}
+            <span className="font-mono text-slate-700 dark:text-gray-200 text-[11px] font-medium">
+              {memUsed}
             </span>
             <span className={`font-mono text-[10px] ${memColorClass.split(' ')[0]}`}>
               ({memPercent}%)
             </span>
           </div>
 
-          {/* 系统盘 */}
+          {/* 磁盘 */}
           <div
-            className="flex items-center space-x-1.5 shrink-0 cursor-default"
-            title={`系统盘 (根目录 /): ${diskUsed} / ${diskTotal} (${diskPercent}%)`}
+            className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shrink-0 shadow-2xs"
+            title={`系统盘 (/): ${diskUsed} / ${diskTotal} (${diskPercent}%)`}
           >
-            <div className="flex items-center space-x-1 text-slate-500 dark:text-gray-400">
-              <HardDrive size={12} className={diskColorClass.split(' ')[0]} />
-              <span>系统盘</span>
-            </div>
-            <div className="w-12 h-1.5 bg-slate-200 dark:bg-[#1f242c] rounded-full overflow-hidden shrink-0">
+            <HardDrive size={12} className={diskColorClass.split(' ')[0]} />
+            <span className="text-slate-500 dark:text-gray-400 font-medium text-[10px]">磁盘</span>
+            <div className="w-10 h-1.5 bg-slate-200/80 dark:bg-white/10 rounded-full overflow-hidden shrink-0">
               <div
                 className={`h-full transition-all duration-500 ${diskColorClass.split(' ')[1]}`}
                 style={{ width: `${Math.min(100, Math.max(0, diskPercent))}%` }}
               ></div>
             </div>
-            <span className="font-mono text-slate-700 dark:text-gray-300">
-              {diskUsed}/{diskTotal}
+            <span className="font-mono text-slate-700 dark:text-gray-200 text-[11px] font-medium">
+              {diskUsed}
             </span>
           </div>
 
-          {/* 网络速率 (上下行) */}
+          {/* 实时网速 */}
           <div
-            className="flex items-center space-x-2 shrink-0 cursor-default font-mono text-[11px]"
-            title={`实时网速 (非本地回环累计)`}
+            className="flex items-center space-x-2 px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shrink-0 shadow-2xs font-mono text-[11px]"
+            title="实时网速 (上行 / 下行)"
           >
-            <div className="flex items-center space-x-0.5 text-cyan-600 dark:text-cyan-400">
+            <div className="flex items-center space-x-0.5 text-cyan-600 dark:text-cyan-400 font-medium">
               <ArrowUp size={11} className="stroke-[2.5]" />
               <span>{txStr}</span>
             </div>
-            <div className="flex items-center space-x-0.5 text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center space-x-0.5 text-emerald-600 dark:text-emerald-400 font-medium">
               <ArrowDown size={11} className="stroke-[2.5]" />
               <span>{rxStr}</span>
             </div>
           </div>
 
-          {/* 系统负载 */}
+          {/* 负载与开机 */}
           <div
-            className="flex items-center space-x-1 shrink-0 cursor-default text-slate-500 dark:text-gray-400 font-mono text-[10px]"
-            title={`系统平均负载 (1, 5, 15 分钟)`}
+            className="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shrink-0 shadow-2xs text-[10px] text-slate-500 dark:text-gray-400"
+            title={`平均负载: ${load1}, ${load5}, ${load15} | 开机时长: ${uptimeStr}`}
           >
             <Gauge size={11} className="text-slate-400 dark:text-gray-500" />
             <span>负载:</span>
-            <span className="text-slate-700 dark:text-gray-300">
-              {load1}, {load5}, {load15}
+            <span className="font-mono text-slate-700 dark:text-gray-300 font-medium">
+              {load1}
             </span>
-          </div>
-
-          {/* 开机时长 */}
-          <div
-            className="flex items-center space-x-1 shrink-0 cursor-default text-slate-500 dark:text-gray-400 text-[10px]"
-            title={`系统开机运行时长`}
-          >
-            <Clock size={11} className="text-slate-400 dark:text-gray-500" />
-            <span className="text-slate-700 dark:text-gray-300">{uptimeStr}</span>
+            <span className="text-slate-300 dark:text-gray-600">|</span>
+            <Clock size={10} className="text-slate-400 dark:text-gray-500" />
+            <span className="text-slate-700 dark:text-gray-300 truncate max-w-[80px]">
+              {uptimeStr}
+            </span>
           </div>
         </div>
 
-        {/* 右侧控制 */}
+        {/* 右侧展开与关闭 */}
         <div className="flex items-center space-x-1 shrink-0 pl-1 border-l border-slate-200 dark:border-white/10">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 text-slate-400 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded transition"
-            title={isExpanded ? '收起详情仪表盘' : '展开 FinalShell 风格仪表盘'}
+            className="p-1 text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10 rounded transition"
+            title={isExpanded ? '收起详情仪表盘' : '展开详细性能监控卡片'}
           >
             {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1 text-slate-400 hover:text-rose-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded transition"
+              className="p-1 text-slate-400 hover:text-rose-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded transition"
               title="隐藏实时状态栏"
             >
               <X size={13} />
@@ -223,9 +212,9 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
 
       {/* 2. 展开的 FinalShell 风格大卡片仪表盘 */}
       {isExpanded && (
-        <div className="p-3 border-t border-slate-200 dark:border-[#30363d]/60 bg-slate-50 dark:bg-[#07090e] grid grid-cols-2 md:grid-cols-4 gap-2.5 animate-in fade-in duration-200">
+        <div className="p-3 border-t border-slate-200 dark:border-[#30363d]/60 bg-slate-100/60 dark:bg-[#07090e] grid grid-cols-2 md:grid-cols-4 gap-2.5 animate-in fade-in duration-200">
           {/* 卡片 1: CPU */}
-          <div className="bg-white dark:bg-[#12161f] border border-slate-200 dark:border-[#21262d] rounded-lg p-2.5 space-y-1.5 shadow-xs">
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-xl p-3 space-y-1.5 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 dark:text-gray-400 text-[11px]">
               <span className="flex items-center space-x-1">
                 <Cpu size={13} className={cpuColorClass.split(' ')[0]} />
@@ -241,7 +230,7 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
                 负载 {load1}
               </span>
             </div>
-            <div className="w-full h-2 bg-slate-200 dark:bg-[#1f242c] rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-slate-100 dark:bg-[#1f242c] rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-500 ${cpuColorClass.split(' ')[1]}`}
                 style={{ width: `${Math.min(100, Math.max(0, cpuPercent))}%` }}
@@ -250,7 +239,7 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
           </div>
 
           {/* 卡片 2: 内存与 Swap */}
-          <div className="bg-white dark:bg-[#12161f] border border-slate-200 dark:border-[#21262d] rounded-lg p-2.5 space-y-1.5 shadow-xs">
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-xl p-3 space-y-1.5 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 dark:text-gray-400 text-[11px]">
               <span className="flex items-center space-x-1">
                 <Layers size={13} className={memColorClass.split(' ')[0]} />
@@ -266,7 +255,7 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
                 Swap: {swapUsed}
               </span>
             </div>
-            <div className="w-full h-2 bg-slate-200 dark:bg-[#1f242c] rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-slate-100 dark:bg-[#1f242c] rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-500 ${memColorClass.split(' ')[1]}`}
                 style={{ width: `${Math.min(100, Math.max(0, memPercent))}%` }}
@@ -275,7 +264,7 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
           </div>
 
           {/* 卡片 3: 系统磁盘 */}
-          <div className="bg-white dark:bg-[#12161f] border border-slate-200 dark:border-[#21262d] rounded-lg p-2.5 space-y-1.5 shadow-xs">
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-xl p-3 space-y-1.5 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 dark:text-gray-400 text-[11px]">
               <span className="flex items-center space-x-1">
                 <HardDrive size={13} className={diskColorClass.split(' ')[0]} />
@@ -289,7 +278,7 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
               </span>
               <span className="text-[10px] text-slate-500 dark:text-gray-400 font-mono">挂载点 /</span>
             </div>
-            <div className="w-full h-2 bg-slate-200 dark:bg-[#1f242c] rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-slate-100 dark:bg-[#1f242c] rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-500 ${diskColorClass.split(' ')[1]}`}
                 style={{ width: `${Math.min(100, Math.max(0, diskPercent))}%` }}
@@ -298,7 +287,7 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
           </div>
 
           {/* 卡片 4: 实时网络流量与运行时间 */}
-          <div className="bg-white dark:bg-[#12161f] border border-slate-200 dark:border-[#21262d] rounded-lg p-2.5 space-y-1.5 shadow-xs">
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-xl p-3 space-y-1.5 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 dark:text-gray-400 text-[11px]">
               <span className="flex items-center space-x-1">
                 <Activity size={13} className="text-cyan-600 dark:text-cyan-400" />

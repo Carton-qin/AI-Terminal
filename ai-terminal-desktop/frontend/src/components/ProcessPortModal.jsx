@@ -281,47 +281,47 @@ export default function ProcessPortModal({
                     <th className="py-2.5 px-3 text-right">管理操作</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#30363d]/60 font-mono">
+                <tbody className="divide-y divide-slate-200 dark:divide-[#30363d]/60 font-mono">
                   {filteredPorts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-gray-500 font-sans">
+                      <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-gray-500 font-sans">
                         {loading ? '正在扫描系统端口...' : '未检索到匹配的监听端口'}
                       </td>
                     </tr>
                   ) : (
                     filteredPorts.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-[#21262d]/50 transition">
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-[#21262d]/50 transition">
                         <td className="py-2 px-3">
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${
+                            className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold border ${
                               item.proto?.toLowerCase().includes('tcp')
-                                ? 'bg-blue-950 text-blue-300 border border-blue-800'
-                                : 'bg-purple-950 text-purple-300 border border-purple-800'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'
+                                : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800'
                             }`}
                           >
                             {item.proto || 'TCP'}
                           </span>
                         </td>
-                        <td className="py-2 px-3 font-bold text-cyan-400 text-sm">
+                        <td className="py-2 px-3 font-bold text-cyan-600 dark:text-cyan-400 text-sm">
                           {item.port}
                         </td>
-                        <td className="py-2 px-3 text-gray-400 text-[11px]">
+                        <td className="py-2 px-3 text-slate-500 dark:text-gray-400 text-[11px]">
                           {item.local_address || item.listen_addr || '*'}
                         </td>
                         <td className="py-2 px-3">
-                          <span className="inline-flex items-center space-x-1 text-emerald-400 text-[11px]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span className="inline-flex items-center space-x-1 text-emerald-600 dark:text-emerald-400 text-[11px]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse"></span>
                             <span>{item.state || 'LISTEN'}</span>
                           </span>
                         </td>
-                        <td className="py-2 px-3 text-gray-300 font-sans text-xs">
+                        <td className="py-2 px-3 text-slate-700 dark:text-gray-300 font-sans text-xs">
                           {item.program ? (
-                            <span className="font-semibold text-white">{item.program}</span>
+                            <span className="font-semibold text-slate-900 dark:text-white">{item.program}</span>
                           ) : (
-                            <span className="text-gray-500 italic">未知进程</span>
+                            <span className="text-slate-400 dark:text-gray-500 italic">未知进程</span>
                           )}
                           {item.pid && (
-                            <span className="ml-2 font-mono text-[11px] text-gray-400">
+                            <span className="ml-2 font-mono text-[11px] text-slate-500 dark:text-gray-400">
                               (PID: {item.pid})
                             </span>
                           )}
@@ -329,7 +329,7 @@ export default function ProcessPortModal({
                         <td className="py-2 px-3 text-right space-x-2 font-sans">
                           <button
                             onClick={() => handleDiagnose(item, 'port')}
-                            className="px-2 py-1 bg-cyan-950/70 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/50 rounded text-[11px] inline-flex items-center space-x-1 transition"
+                            className="px-2.5 py-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 dark:bg-cyan-950/70 dark:hover:bg-cyan-900 dark:text-cyan-300 dark:border-cyan-700/50 rounded-lg text-[11px] inline-flex items-center space-x-1 transition shadow-2xs"
                             title="向 AI Copilot 咨询此端口服务的安全性与用途"
                           >
                             <Sparkles size={11} />
@@ -338,7 +338,7 @@ export default function ProcessPortModal({
                           {item.pid && (
                             <button
                               onClick={() => handleKillProcess(item.pid, 'TERM', item.program)}
-                              className="px-2 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800 rounded text-[11px] inline-flex items-center space-x-1 transition"
+                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-red-950/60 dark:hover:bg-red-900 dark:text-red-300 dark:border-red-800 rounded-lg text-[11px] inline-flex items-center space-x-1 transition shadow-2xs"
                               title="向进程发送 SIGTERM 优雅退出信号"
                             >
                               <Trash2 size={11} />

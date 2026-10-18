@@ -214,7 +214,7 @@ class PTYSession:
             },
             "uptime": {
                 "seconds": 0,
-                "str": "本地 macOS",
+                "str": f"本地 {self.os_info['os_name']}",
             },
         }
 
@@ -476,4 +476,4 @@ class PTYSession:
         return ""
 
     def collect_health_data(self) -> dict:
-        return {"raw": "macOS local session", "os_info": self.os_info}
+        return {"raw": f"{self.os_info['distro']} local session", "os_info": self.os_info}

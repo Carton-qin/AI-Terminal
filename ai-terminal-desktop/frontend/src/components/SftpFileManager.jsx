@@ -952,12 +952,12 @@ export default function SftpFileManager({
       {/* 3. 在线文本编辑器全屏 / 弹窗 */}
       {editorFile && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="h-10 bg-[#0d1117] border-b border-[#30363d] px-4 flex items-center justify-between text-xs select-none">
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-lg shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="h-10 bg-slate-100 dark:bg-[#0d1117] border-b border-slate-200 dark:border-[#30363d] px-4 flex items-center justify-between text-xs select-none">
               <div className="flex items-center space-x-2">
-                <FileCode size={16} className="text-cyan-400" />
-                <span className="font-semibold text-gray-200 font-mono">{editorFile.name}</span>
-                <span className="text-[11px] text-gray-500 font-mono truncate max-w-md">
+                <FileCode size={16} className="text-cyan-500 dark:text-cyan-400" />
+                <span className="font-semibold text-slate-800 dark:text-gray-200 font-mono">{editorFile.name}</span>
+                <span className="text-[11px] text-slate-500 dark:text-gray-500 font-mono truncate max-w-md">
                   ({editorFile.path})
                 </span>
                 {editorFile.content !== editorFile.originalContent && (
@@ -966,7 +966,7 @@ export default function SftpFileManager({
               </div>
 
               <div className="flex items-center space-x-2">
-                <span className="text-[10px] text-gray-400">Ctrl+S / ⌘S 快速保存</span>
+                <span className="text-[10px] text-slate-500 dark:text-gray-400">Ctrl+S / ⌘S 快速保存</span>
                 <button
                   onClick={handleSaveEditorFile}
                   disabled={editorFile.saving || editorFile.content === editorFile.originalContent}
@@ -985,14 +985,14 @@ export default function SftpFileManager({
                     }
                     setEditorFile(null)
                   }}
-                  className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded transition"
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 rounded transition"
                 >
                   <X size={16} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 relative bg-[#090d13] p-2 overflow-hidden flex flex-col">
+            <div className="flex-1 relative bg-slate-900 dark:bg-[#090d13] p-2 overflow-hidden flex flex-col">
               <textarea
                 value={editorFile.content}
                 onChange={(e) =>
@@ -1025,9 +1025,9 @@ export default function SftpFileManager({
       {/* 4. 新建文件夹模态框 */}
       {mkdirModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-4 w-80 shadow-xl">
-            <h3 className="text-xs font-semibold text-gray-200 mb-2 flex items-center space-x-1.5">
-              <FolderPlus size={14} className="text-amber-400" />
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-lg p-4 w-80 shadow-xl">
+            <h3 className="text-xs font-semibold text-slate-800 dark:text-gray-200 mb-2 flex items-center space-x-1.5">
+              <FolderPlus size={14} className="text-amber-500 dark:text-amber-400" />
               <span>新建文件夹</span>
             </h3>
             <input
@@ -1037,12 +1037,12 @@ export default function SftpFileManager({
               onChange={(e) => setNewDirName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateDir()}
               placeholder="文件夹名称..."
-              className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-cyan-500 mb-3"
+              className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d] rounded px-2.5 py-1.5 text-xs text-slate-800 dark:text-gray-200 focus:outline-none focus:border-cyan-500 mb-3"
             />
             <div className="flex justify-end space-x-2 text-xs">
               <button
                 onClick={() => setMkdirModalOpen(false)}
-                className="px-2.5 py-1 rounded bg-[#21262d] text-gray-300 hover:bg-[#30363d]"
+                className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] text-slate-700 dark:text-gray-300 dark:hover:bg-[#30363d]"
               >
                 取消
               </button>
@@ -1060,18 +1060,18 @@ export default function SftpFileManager({
       {/* 5. 权限修改 (Chmod) 可视化模态框 */}
       {chmodModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-4 w-96 shadow-xl text-xs">
-            <h3 className="font-semibold text-gray-200 mb-2 flex items-center space-x-1.5">
-              <Lock size={14} className="text-cyan-400" />
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-lg p-4 w-96 shadow-xl text-xs">
+            <h3 className="font-semibold text-slate-800 dark:text-gray-200 mb-2 flex items-center space-x-1.5">
+              <Lock size={14} className="text-cyan-500 dark:text-cyan-400" />
               <span>修改文件权限 (Chmod)</span>
             </h3>
-            <p className="text-[11px] text-gray-400 mb-3 font-mono truncate">
+            <p className="text-[11px] text-slate-500 dark:text-gray-400 mb-3 font-mono truncate">
               {chmodModal.item.name}
             </p>
 
             {/* 常用预设快捷按钮 */}
             <div className="mb-3">
-              <span className="text-[10px] text-gray-400 block mb-1">常用权限预设：</span>
+              <span className="text-[10px] text-slate-500 dark:text-gray-400 block mb-1">常用权限预设：</span>
               <div className="grid grid-cols-4 gap-1.5 text-[11px]">
                 {['755', '644', '600', '777'].map((p) => (
                   <button
@@ -1079,8 +1079,8 @@ export default function SftpFileManager({
                     onClick={() => setChmodModal((prev) => ({ ...prev, mode: p }))}
                     className={`py-1 rounded border transition font-mono ${
                       chmodModal.mode === p
-                        ? 'bg-cyan-950 text-cyan-300 border-cyan-500'
-                        : 'bg-[#21262d] text-gray-300 border-white/5 hover:bg-[#30363d]'
+                        ? 'bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border-cyan-500 font-bold'
+                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] text-slate-700 dark:text-gray-300 border-slate-200 dark:border-white/5 dark:hover:bg-[#30363d]'
                     }`}
                   >
                     {p}
@@ -1090,26 +1090,26 @@ export default function SftpFileManager({
             </div>
 
             <div className="mb-3">
-              <label className="text-[10px] text-gray-400 block mb-1">权限数值 (八进制)：</label>
+              <label className="text-[10px] text-slate-500 dark:text-gray-400 block mb-1">权限数值 (八进制)：</label>
               <input
                 type="text"
                 value={chmodModal.mode}
                 onChange={(e) =>
                   setChmodModal((prev) => ({ ...prev, mode: e.target.value }))
                 }
-                className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-cyan-500"
+                className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d] rounded px-2.5 py-1.5 text-xs text-slate-800 dark:text-gray-200 font-mono focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {chmodModal.item.is_dir && (
-              <label className="flex items-center space-x-2 text-[11px] text-gray-300 mb-3 cursor-pointer">
+              <label className="flex items-center space-x-2 text-[11px] text-slate-700 dark:text-gray-300 mb-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={chmodModal.recursive}
                   onChange={(e) =>
                     setChmodModal((prev) => ({ ...prev, recursive: e.target.checked }))
                   }
-                  className="rounded border-[#30363d]"
+                  className="rounded border-slate-300 dark:border-[#30363d]"
                 />
                 <span>递归应用到所有子文件与子目录 (-R)</span>
               </label>
@@ -1118,7 +1118,7 @@ export default function SftpFileManager({
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setChmodModal(null)}
-                className="px-2.5 py-1 rounded bg-[#21262d] text-gray-300 hover:bg-[#30363d]"
+                className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] text-slate-700 dark:text-gray-300 dark:hover:bg-[#30363d]"
               >
                 取消
               </button>
@@ -1136,21 +1136,21 @@ export default function SftpFileManager({
       {/* 6. 解压缩确认模态框 */}
       {extractModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-purple-500/40 rounded-lg p-4 w-88 shadow-xl text-xs">
-            <h3 className="font-semibold text-purple-400 mb-2 flex items-center space-x-1.5">
+          <div className="bg-white dark:bg-[#161b22] border border-purple-300 dark:border-purple-500/40 rounded-lg p-4 w-88 shadow-xl text-xs">
+            <h3 className="font-semibold text-purple-600 dark:text-purple-400 mb-2 flex items-center space-x-1.5">
               <Archive size={14} />
               <span>一键解压缩</span>
             </h3>
-            <p className="text-gray-300 mb-2">
-              确定将压缩包 <span className="font-mono text-white font-bold">{extractModal.name}</span> 解压到当前目录吗？
+            <p className="text-slate-700 dark:text-gray-300 mb-2">
+              确定将压缩包 <span className="font-mono text-slate-900 dark:text-white font-bold">{extractModal.name}</span> 解压到当前目录吗？
             </p>
-            <p className="text-[11px] text-gray-400 mb-4 font-mono truncate">
+            <p className="text-[11px] text-slate-500 dark:text-gray-400 mb-4 font-mono truncate">
               目标路径: {currentPath}
             </p>
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setExtractModal(null)}
-                className="px-2.5 py-1 rounded bg-[#21262d] text-gray-300 hover:bg-[#30363d]"
+                className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] text-slate-700 dark:text-gray-300 dark:hover:bg-[#30363d]"
               >
                 取消
               </button>
@@ -1168,16 +1168,16 @@ export default function SftpFileManager({
       {/* 7. 压缩为模态框 */}
       {compressModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-4 w-96 shadow-xl text-xs">
-            <h3 className="font-semibold text-amber-400 mb-2 flex items-center space-x-1.5">
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-lg p-4 w-96 shadow-xl text-xs">
+            <h3 className="font-semibold text-amber-600 dark:text-amber-400 mb-2 flex items-center space-x-1.5">
               <Layers size={14} />
               <span>打包压缩</span>
             </h3>
-            <p className="text-gray-300 mb-2">
-              将选中的目标 <span className="font-mono text-white font-bold">{compressModal.item.name}</span> 压缩为归档文件：
+            <p className="text-slate-700 dark:text-gray-300 mb-2">
+              将选中的目标 <span className="font-mono text-slate-900 dark:text-white font-bold">{compressModal.item.name}</span> 压缩为归档文件：
             </p>
             <div className="mb-3">
-              <label className="text-[10px] text-gray-400 block mb-1">压缩文件名：</label>
+              <label className="text-[10px] text-slate-500 dark:text-gray-400 block mb-1">压缩文件名：</label>
               <input
                 type="text"
                 autoFocus
@@ -1185,13 +1185,13 @@ export default function SftpFileManager({
                 onChange={(e) =>
                   setCompressModal((prev) => ({ ...prev, name: e.target.value }))
                 }
-                className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1.5 text-xs text-gray-200 font-mono focus:outline-none focus:border-cyan-500"
+                className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d] rounded px-2.5 py-1.5 text-xs text-slate-800 dark:text-gray-200 font-mono focus:outline-none focus:border-cyan-500"
               />
             </div>
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setCompressModal(null)}
-                className="px-2.5 py-1 rounded bg-[#21262d] text-gray-300 hover:bg-[#30363d]"
+                className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] text-slate-700 dark:text-gray-300 dark:hover:bg-[#30363d]"
               >
                 取消
               </button>
@@ -1209,9 +1209,9 @@ export default function SftpFileManager({
       {/* 8. 重命名模态框 */}
       {renameModalOpen && renameItem && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-4 w-80 shadow-xl">
-            <h3 className="text-xs font-semibold text-gray-200 mb-2 flex items-center space-x-1.5">
-              <Edit3 size={14} className="text-amber-400" />
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-lg p-4 w-80 shadow-xl">
+            <h3 className="text-xs font-semibold text-slate-800 dark:text-gray-200 mb-2 flex items-center space-x-1.5">
+              <Edit3 size={14} className="text-amber-500 dark:text-amber-400" />
               <span>重命名</span>
             </h3>
             <input
@@ -1220,12 +1220,12 @@ export default function SftpFileManager({
               value={renameNewName}
               onChange={(e) => setRenameNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-              className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-cyan-500 mb-3"
+              className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d] rounded px-2.5 py-1.5 text-xs text-slate-800 dark:text-gray-200 focus:outline-none focus:border-cyan-500 mb-3"
             />
             <div className="flex justify-end space-x-2 text-xs">
               <button
                 onClick={() => setRenameModalOpen(false)}
-                className="px-2.5 py-1 rounded bg-[#21262d] text-gray-300 hover:bg-[#30363d]"
+                className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] text-slate-700 dark:text-gray-300 dark:hover:bg-[#30363d]"
               >
                 取消
               </button>
@@ -1243,20 +1243,20 @@ export default function SftpFileManager({
       {/* 9. 删除确认模态框 */}
       {deleteItemModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-red-500/40 rounded-lg p-4 w-80 shadow-xl">
-            <h3 className="text-xs font-semibold text-red-400 mb-2 flex items-center space-x-1.5">
+          <div className="bg-white dark:bg-[#161b22] border border-red-300 dark:border-red-500/40 rounded-lg p-4 w-80 shadow-xl">
+            <h3 className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center space-x-1.5">
               <Trash2 size={14} />
               <span>确认删除</span>
             </h3>
-            <p className="text-xs text-gray-300 mb-4 break-all">
+            <p className="text-xs text-slate-700 dark:text-gray-300 mb-4 break-all">
               确定要永久删除{' '}
-              <span className="font-mono text-white font-bold">{deleteItemModal.name}</span> 吗？
+              <span className="font-mono text-slate-900 dark:text-white font-bold">{deleteItemModal.name}</span> 吗？
               {deleteItemModal.is_dir && '（包含目录下所有文件）'}
             </p>
             <div className="flex justify-end space-x-2 text-xs">
               <button
                 onClick={() => setDeleteItemModal(null)}
-                className="px-2.5 py-1 rounded bg-[#21262d] text-gray-300 hover:bg-[#30363d]"
+                className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] text-slate-700 dark:text-gray-300 dark:hover:bg-[#30363d]"
               >
                 取消
               </button>

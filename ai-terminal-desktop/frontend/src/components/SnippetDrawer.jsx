@@ -492,7 +492,7 @@ export default function SnippetDrawer({ isOpen, onClose, onInjectCommand }) {
                       )}
 
                       {/* 脚本命令代码预览区 */}
-                      <div className="bg-[#0b0e14] border border-slate-700/60 rounded-lg p-3 font-mono text-xs text-emerald-300 max-h-36 overflow-y-auto whitespace-pre-wrap select-text leading-relaxed">
+                      <div className="bg-slate-900 dark:bg-[#0b0e14] border border-slate-800 dark:border-slate-700/60 rounded-lg p-3 font-mono text-xs text-emerald-400 dark:text-emerald-300 max-h-36 overflow-y-auto whitespace-pre-wrap select-text leading-relaxed">
                         {snip.script}
                       </div>
 

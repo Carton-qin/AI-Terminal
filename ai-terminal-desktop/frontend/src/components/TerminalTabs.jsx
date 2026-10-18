@@ -465,7 +465,8 @@ export default function TerminalTabs({
 
     ws.onopen = () => {
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
-      if (isReconnection) {
+      // 本地终端无需远端网络握手，直接确认重连成功
+      if (isReconnection && tab.type === 'local') {
         term.write('\r\n\x1b[32m[✓ 自动重连成功！已恢复会话连接]\x1b[0m\r\n')
         setReconnectStates((prev) => {
           const next = { ...prev }
@@ -525,6 +526,35 @@ export default function TerminalTabs({
     }
 
     ws.onmessage = (event) => {
+      // 0. 控制信令拦截 (SSH 连通 / 握手失败)
+      if (typeof event.data === 'string' && event.data.startsWith('{') && event.data.endsWith('}')) {
+        try {
+          const ctrl = JSON.parse(event.data)
+          if (ctrl.type === 'ssh_connected') {
+            tab._sshConnected = true
+            tab._sshFailed = false
+            if (isReconnection) {
+              term.write('\r\n\x1b[32m[✓ 自动重连成功！已恢复会话连接]\x1b[0m\r\n')
+            }
+            setReconnectStates((prev) => {
+              const next = { ...prev }
+              delete next[id]
+              return next
+            })
+            return
+          } else if (ctrl.type === 'ssh_connect_failed') {
+            tab._sshConnected = false
+            tab._sshFailed = true
+            // 目标不可达或认证失败，终止死循环自动重试，等待用户排障后手动重试
+            setReconnectStates((prev) => ({
+              ...prev,
+              [id]: { attempt: 5, maxAttempts: 5, countdown: 0, failed: true, reason: ctrl.error },
+            }))
+            return
+          }
+        } catch (e) {}
+      }
+
       // 1. 零延迟即时送入终端渲染，由 xterm 内部高性能引擎处理，不占用任何 JS 堆栈
       if (typeof event.data === 'string') {
         term.write(event.data)
@@ -546,6 +576,11 @@ export default function TerminalTabs({
       if (manualCloseTabIds.current.has(id)) return
 
       term.write('\r\n\x1b[33m[与服务器连接已断开]\x1b[0m\r\n')
+
+      // 若为初始握手失败或主机不可达，不进入自动死循环重试
+      if (tab._sshFailed) {
+        return
+      }
 
       setReconnectStates((prev) => {
         const currentAttempt = prev[id]?.attempt || 0
@@ -577,6 +612,8 @@ export default function TerminalTabs({
   const triggerReconnectTab = async (tabId) => {
     const tab = tabs.find((t) => t.id === tabId)
     if (!tab) return
+
+    tab._sshFailed = false
 
     setReconnectStates((prev) => ({
       ...prev,
@@ -944,7 +981,7 @@ export default function TerminalTabs({
                 <span className="font-semibold text-slate-800 dark:text-gray-200 text-xs whitespace-nowrap">
                   {currentActiveTab?.type === 'ssh'
                     ? (currentActiveTab.host?.name || currentActiveTab.hostName || currentActiveTab.title).replace(/\s*\([^)]*\)$/, '')
-                    : '本地 macOS'}
+                    : (currentActiveTab?.osLabel ? `本地 ${currentActiveTab.osLabel}` : '本地终端')}
                 </span>
                 {currentActiveTab?.type === 'ssh' && (
                   <span className="px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-white/5 text-slate-600 dark:text-gray-400 font-mono text-[10px] whitespace-nowrap">

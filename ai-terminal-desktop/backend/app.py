@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import platform
 import uuid
 from typing import Any, Dict, List, Optional, Union
 
@@ -283,21 +284,32 @@ def create_session(req: SessionCreateRequest):
     session_id = str(uuid.uuid4())[:8]
 
     if req.type == "local":
+        is_win = platform.system() == "Windows"
+        is_mac = platform.system() == "Darwin"
+        os_label = "Windows" if is_win else ("macOS" if is_mac else "Linux")
+        distro_name = f"Windows {platform.release()}" if is_win else ("macOS" if is_mac else "Linux")
+        local_name = f"本地终端 ({os_label})"
         active_sessions[session_id] = {
             "type": "local",
-            "name": "本地终端 (macOS)",
+            "name": local_name,
             "instance": None,
             "cols": req.cols,
             "rows": req.rows,
             "os_info": {
-                "os_name": "Darwin",
-                "distro": "macOS",
-                "arch": "arm64",
-                "username": os.getenv("USER", "user"),
-                "is_root": False,
+                "os_name": platform.system(),
+                "distro": distro_name,
+                "arch": platform.machine(),
+                "username": os.getenv("USERNAME" if is_win else "USER", "user"),
+                "is_root": False if is_win else (os.geteuid() == 0 if hasattr(os, "geteuid") else False),
             },
         }
-        return {"session_id": session_id, "type": "local", "name": "本地终端"}
+        return {
+            "session_id": session_id,
+            "type": "local",
+            "name": local_name,
+            "os_label": os_label,
+            "os_info": active_sessions[session_id]["os_info"],
+        }
 
     elif req.type == "ssh":
         if not req.host_id:
@@ -405,9 +417,26 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
             )
             # 在单独线程启动 SSH
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, terminal_instance.connect, send_to_client, loop)
-            session_info["instance"] = terminal_instance
-            session_info["os_info"] = terminal_instance.os_info
+            try:
+                await loop.run_in_executor(None, terminal_instance.connect, send_to_client, loop)
+                session_info["instance"] = terminal_instance
+                session_info["os_info"] = terminal_instance.os_info
+                # 通知前端远端 SSH 已经成功建立连接
+                await websocket.send_text(json.dumps({"type": "ssh_connected", "session_id": session_id}))
+            except Exception as e:
+                err_str = str(e)
+                tip = ""
+                if "Unable to connect to port" in err_str or "timed out" in err_str or "Connection refused" in err_str:
+                    tip = (
+                        f"\r\n\x1b[33m[排障指引] 无法连通目标服务器 {session_info['ip']}:{session_info['port']}：\r\n"
+                        f" 1. 若连接 NAS(如飞牛/群晖)或局域网主机：请登录控制面板检查「终端与SSH」服务是否已开启，并确认 SSH 端口号。\r\n"
+                        f" 2. 请确认本机 WiFi/局域网与目标主机在同一网段，且目标 IP 地址无误、防火墙已放行端口。\x1b[0m\r\n"
+                    )
+                elif "Authentication failed" in err_str:
+                    tip = "\r\n\x1b[33m[排障指引] SSH 认证失败，请在主机管理中检查所填写的用户名、密码或私钥凭据。\x1b[0m\r\n"
+                await websocket.send_text(f"\r\n\x1b[31m[终端连接异常: {err_str}]\x1b[0m{tip}\r\n")
+                await websocket.send_text(json.dumps({"type": "ssh_connect_failed", "error": err_str}))
+                return
 
         # 接收前端交互
         while True:

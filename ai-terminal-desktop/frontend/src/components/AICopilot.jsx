@@ -220,7 +220,7 @@ export default function AICopilot({
             session_id: targetTab?.sessionId,
             os_info:
               sessionDetails?.os_info ||
-              (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : '本地 macOS'),
+              (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : `本地 ${targetTab?.osLabel || '系统'}`),
           }),
         })
 
@@ -465,7 +465,7 @@ export default function AICopilot({
           session_id: targetTab?.sessionId,
           os_info:
             sessionDetails?.os_info ||
-            (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : '本地 macOS'),
+            (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : `本地 ${targetTab?.osLabel || '系统'}`),
         }),
       })
 
@@ -539,7 +539,7 @@ export default function AICopilot({
           session_id: targetTab?.sessionId,
           os_info:
             sessionDetails?.os_info ||
-            (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : '本地 macOS'),
+            (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : `本地 ${targetTab?.osLabel || '系统'}`),
           history: historyList,
         }),
       })
@@ -659,7 +659,7 @@ export default function AICopilot({
           session_id: targetTab?.sessionId,
           os_info:
             sessionDetails?.os_info ||
-            (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : '本地 macOS'),
+            (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : `本地 ${targetTab?.osLabel || '系统'}`),
         }),
       })
       const data = await res.json()
@@ -693,7 +693,7 @@ export default function AICopilot({
           session_id: targetTab?.sessionId,
           os_info:
             sessionDetails?.os_info ||
-            (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : '本地 macOS'),
+            (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : `本地 ${targetTab?.osLabel || '系统'}`),
         }),
       })
       const data = await res.json()
@@ -742,7 +742,7 @@ export default function AICopilot({
   const currentEnvLabel =
     targetTab?.type === 'ssh'
       ? sessionDetails?.os_info?.distro || targetTab.title || '远程 VPS'
-      : 'macOS (本地)'
+      : (targetTab?.osLabel ? `${targetTab.osLabel} (本地)` : '本地系统')
   const currentUserLabel =
     sessionDetails?.os_info?.username || (targetTab?.type === 'ssh' ? 'root' : 'user')
 
@@ -1147,13 +1147,13 @@ export default function AICopilot({
       {activeSubTab === 'agent' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* 顶部控制与目标设定区 */}
-          <div className="p-3 border-b border-[#30363d] bg-[#0d1117] space-y-2.5 shrink-0">
+          <div className="p-3 border-b border-slate-200 dark:border-[#30363d] bg-slate-50/80 dark:bg-[#0d1117] space-y-2.5 shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-1.5 font-semibold text-xs text-amber-300">
+              <div className="flex items-center space-x-1.5 font-semibold text-xs text-amber-600 dark:text-amber-300">
                 <Target size={14} className={isAgentRunning ? 'animate-spin' : ''} />
                 <span>目标导向自主 Agent</span>
               </div>
-              <span className="text-[10px] text-gray-400 bg-[#161b22] px-1.5 py-0.5 rounded border border-gray-700">
+              <span className="text-[10px] text-slate-500 dark:text-gray-400 bg-white dark:bg-[#161b22] px-1.5 py-0.5 rounded border border-slate-200 dark:border-gray-700">
                 环境: {currentEnvLabel}
               </span>
             </div>
@@ -1164,19 +1164,19 @@ export default function AICopilot({
               onChange={(e) => setAgentTask(e.target.value)}
               disabled={isAgentRunning}
               placeholder="输入运维或排障目标，如：'排查为什么 80 端口被占并修复 Nginx' 或 '安装 Docker 并验证'..."
-              className="w-full bg-[#161b22] border border-[#30363d] rounded p-2 text-xs text-white focus:outline-none focus:border-amber-500 resize-none transition"
+              className="w-full bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded p-2 text-xs text-slate-800 dark:text-white focus:outline-none focus:border-amber-500 resize-none transition"
             />
 
             {/* 常用目标预设快捷标签 */}
             {!isAgentRunning && agentSteps.length === 0 && (
               <div className="space-y-1">
-                <div className="text-[10px] text-gray-500">点击快捷填入预设目标:</div>
+                <div className="text-[10px] text-slate-400 dark:text-gray-500">点击快捷填入预设目标:</div>
                 <div className="flex flex-wrap gap-1">
                   {agentPresets.map((preset, idx) => (
                     <button
                       key={idx}
                       onClick={() => setAgentTask(preset.task)}
-                      className="text-[10px] px-1.5 py-0.5 bg-[#161b22] hover:bg-[#21262d] text-gray-300 hover:text-amber-300 rounded border border-gray-700/60 transition truncate max-w-full"
+                      className="text-[10px] px-1.5 py-0.5 bg-white dark:bg-[#161b22] hover:bg-slate-100 dark:hover:bg-[#21262d] text-slate-600 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-300 rounded border border-slate-200 dark:border-gray-700/60 transition truncate max-w-full"
                     >
                       {preset.label}
                     </button>
@@ -1187,7 +1187,7 @@ export default function AICopilot({
 
             {/* 参数与启动/终止按钮 */}
             <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center space-x-1 text-[10px] text-gray-400">
+              <div className="flex items-center space-x-1 text-[10px] text-slate-500 dark:text-gray-400">
                 <span>最大限制:</span>
                 {[3, 5, 8].map((n) => (
                   <button
@@ -1196,8 +1196,8 @@ export default function AICopilot({
                     onClick={() => setAgentMaxSteps(n)}
                     className={`px-1.5 py-0.5 rounded transition ${
                       agentMaxSteps === n
-                        ? 'bg-amber-950 text-amber-300 border border-amber-700 font-bold'
-                        : 'bg-[#161b22] text-gray-400 border border-transparent hover:text-gray-200'
+                        ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 font-bold'
+                        : 'bg-slate-200/70 dark:bg-[#161b22] text-slate-600 dark:text-gray-400 border border-transparent hover:text-slate-900 dark:hover:text-gray-200'
                     }`}
                   >
                     {n}步
@@ -1208,7 +1208,7 @@ export default function AICopilot({
               {agentSteps.length > 0 && !isAgentRunning && (
                 <button
                   onClick={resetAgentSession}
-                  className="text-[10px] text-gray-400 hover:text-red-400 flex items-center space-x-1 transition"
+                  className="text-[10px] text-slate-400 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 flex items-center space-x-1 transition"
                   title="清空当前排查记录"
                 >
                   <Trash2 size={11} />
@@ -1226,7 +1226,7 @@ export default function AICopilot({
                   <Square size={12} fill="currentColor" />
                   <span>终止 Agent 任务</span>
                 </button>
-                <div className="text-[11px] font-mono text-amber-300 px-2 py-1 bg-[#161b22] rounded border border-amber-800/60 flex items-center space-x-1 shrink-0">
+                <div className="text-[11px] font-mono text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-50 dark:bg-[#161b22] rounded border border-amber-200 dark:border-amber-800/60 flex items-center space-x-1 shrink-0">
                   <RefreshCw size={11} className="animate-spin" />
                   <span>{currentAgentStep} / {agentMaxSteps} 步</span>
                 </div>
@@ -1245,15 +1245,15 @@ export default function AICopilot({
 
           {/* 高危拦截挂起弹窗/警告条 */}
           {agentPausedForDanger && (
-            <div className="m-2.5 p-2.5 bg-red-950/70 border-2 border-red-600 rounded-lg text-xs space-y-2 animate-in fade-in shrink-0">
-              <div className="flex items-center space-x-1.5 text-red-300 font-bold text-xs">
-                <AlertTriangle size={15} className="text-red-400 animate-pulse shrink-0" />
+            <div className="m-2.5 p-2.5 bg-red-50 dark:bg-red-950/70 border-2 border-red-500 dark:border-red-600 rounded-lg text-xs space-y-2 animate-in fade-in shrink-0">
+              <div className="flex items-center space-x-1.5 text-red-600 dark:text-red-300 font-bold text-xs">
+                <AlertTriangle size={15} className="text-red-500 dark:text-red-400 animate-pulse shrink-0" />
                 <span>高危命令拦截（第 {agentPausedForDanger.step} 步）</span>
               </div>
-              <div className="bg-[#0d1117] p-2 rounded font-mono text-[11px] text-red-300 break-all border border-red-800">
+              <div className="bg-red-100/60 dark:bg-[#0d1117] p-2 rounded font-mono text-[11px] text-red-700 dark:text-red-300 break-all border border-red-200 dark:border-red-800">
                 {agentPausedForDanger.command}
               </div>
-              <p className="text-[11px] text-gray-300 leading-relaxed">
+              <p className="text-[11px] text-slate-700 dark:text-gray-300 leading-relaxed">
                 {agentPausedForDanger.reason}。系统已自动挂起排障循环，请确认是否执行。
               </p>
               <div className="flex space-x-2 pt-1">
@@ -1265,13 +1265,13 @@ export default function AICopilot({
                 </button>
                 <button
                   onClick={() => handleDangerDecision(false)}
-                  className="flex-1 py-1.5 bg-[#21262d] hover:bg-[#30363d] text-gray-300 rounded text-xs transition"
+                  className="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-[#21262d] dark:hover:bg-[#30363d] text-slate-700 dark:text-gray-300 rounded text-xs transition"
                 >
                   跳过该指令
                 </button>
                 <button
                   onClick={stopAgentLoop}
-                  className="px-2 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded text-xs transition"
+                  className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-400 rounded text-xs transition"
                 >
                   终止任务
                 </button>
@@ -1282,10 +1282,10 @@ export default function AICopilot({
           {/* 步骤时间线卡片流 */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {agentSteps.length === 0 && !isAgentRunning && (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4 text-gray-500 space-y-2.5 select-none">
-                <Bot size={36} className="text-amber-400 opacity-40 animate-pulse" />
-                <div className="text-xs text-gray-400 font-medium">连续自主排障 Agent 就绪</div>
-                <p className="text-[11px] text-gray-600 max-w-xs leading-relaxed">
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-400 dark:text-gray-500 space-y-2.5 select-none">
+                <Bot size={36} className="text-amber-500 dark:text-amber-400 opacity-40 animate-pulse" />
+                <div className="text-xs text-slate-600 dark:text-gray-400 font-medium">连续自主排障 Agent 就绪</div>
+                <p className="text-[11px] text-slate-400 dark:text-gray-600 max-w-xs leading-relaxed">
                   输入你的运维或排障任务，点击启动后，AI 将自动分析、执行第一条指令、捕获真实输出并继续推理，直到彻底达成目标！
                 </p>
               </div>
@@ -1294,42 +1294,42 @@ export default function AICopilot({
             {agentSteps.map((stepItem) => (
               <div
                 key={stepItem.step}
-                className="bg-[#0d1117] border border-[#30363d] rounded-lg p-2.5 text-xs space-y-2 animate-in fade-in"
+                className="bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d] rounded-lg p-2.5 text-xs space-y-2 animate-in fade-in"
               >
                 {/* 步骤标题与状态标识 */}
-                <div className="flex items-center justify-between border-b border-[#21262d] pb-1.5">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#21262d] pb-1.5">
                   <div className="flex items-center space-x-1.5">
-                    <span className="font-bold text-amber-400 font-mono text-[11px] bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/40">
+                    <span className="font-bold text-amber-700 dark:text-amber-400 font-mono text-[11px] bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
                       第 {stepItem.step} 步
                     </span>
                   </div>
                   <div>
                     {stepItem.status === 'THINKING' && (
-                      <span className="text-[10px] text-amber-400 flex items-center space-x-1">
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center space-x-1">
                         <RefreshCw size={10} className="animate-spin" />
                         <span>AI 规划推理中...</span>
                       </span>
                     )}
                     {stepItem.isExecuting && (
-                      <span className="text-[10px] text-cyan-300 flex items-center space-x-1 font-mono">
+                      <span className="text-[10px] text-cyan-600 dark:text-cyan-300 flex items-center space-x-1 font-mono">
                         <RefreshCw size={10} className="animate-spin" />
                         <span>{stepItem.waitProgress || '终端执行中...'}</span>
                       </span>
                     )}
                     {!stepItem.isExecuting && stepItem.status === 'CONTINUE' && (
-                      <span className="text-[10px] text-emerald-400 flex items-center space-x-1 font-mono">
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center space-x-1 font-mono">
                         <CheckCircle2 size={11} />
                         <span>已执行并推进</span>
                       </span>
                     )}
                     {stepItem.status === 'DONE' && (
-                      <span className="text-[10px] text-emerald-400 font-bold flex items-center space-x-1 font-mono">
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center space-x-1 font-mono">
                         <CheckCircle2 size={11} />
                         <span>🎉 目标达成</span>
                       </span>
                     )}
                     {stepItem.status === 'BLOCKED' && (
-                      <span className="text-[10px] text-red-400 font-bold flex items-center space-x-1 font-mono">
+                      <span className="text-[10px] text-red-600 dark:text-red-400 font-bold flex items-center space-x-1 font-mono">
                         <AlertTriangle size={11} />
                         <span>排查阻塞</span>
                       </span>
@@ -1339,8 +1339,8 @@ export default function AICopilot({
 
                 {/* 🧠 AI 规划思考 */}
                 {stepItem.thought && (
-                  <div className="text-gray-300 leading-relaxed text-[11px] bg-[#161b22] p-2 rounded border border-[#21262d]">
-                    <span className="text-amber-400 font-semibold mr-1">🧠 思考:</span>
+                  <div className="text-slate-700 dark:text-gray-300 leading-relaxed text-[11px] bg-slate-50 dark:bg-[#161b22] p-2 rounded border border-slate-200 dark:border-[#21262d]">
+                    <span className="text-amber-600 dark:text-amber-400 font-semibold mr-1">🧠 思考:</span>
                     {stepItem.thought}
                   </div>
                 )}
@@ -1348,17 +1348,17 @@ export default function AICopilot({
                 {/* 💻 执行命令 */}
                 {stepItem.command && (
                   <div className="space-y-1">
-                    <div className="bg-[#161b22] border border-cyan-900/60 rounded p-2 font-mono text-[11px] text-cyan-300 break-all flex justify-between items-start group">
+                    <div className="bg-slate-50 dark:bg-[#161b22] border border-cyan-200 dark:border-cyan-900/60 rounded p-2 font-mono text-[11px] text-cyan-700 dark:text-cyan-300 break-all flex justify-between items-start group">
                       <div className="pr-2">{stepItem.command}</div>
                       <div className="flex items-center space-x-1 shrink-0 pt-0.5">
                         {stepItem.risk && (
                           <span
                             className={`text-[9px] px-1 py-0.2 rounded font-mono ${
                               stepItem.risk.level === 'SAFE'
-                                ? 'bg-emerald-950 text-emerald-400'
+                                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400'
                                 : stepItem.risk.level === 'MODERATE'
-                                ? 'bg-amber-950 text-amber-400'
-                                : 'bg-red-950 text-red-400 font-bold'
+                                ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400'
+                                : 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 font-bold'
                             }`}
                           >
                             {stepItem.risk.level === 'SAFE' ? '🟢安全' : '🔴高危'}
@@ -1366,11 +1366,11 @@ export default function AICopilot({
                         )}
                         <button
                           onClick={() => copyToClipboard(stepItem.command, 'agent-cmd-' + stepItem.step)}
-                          className="p-0.5 text-gray-400 hover:text-white transition"
+                          className="p-0.5 text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white transition"
                           title="复制代码"
                         >
                           {copiedId === 'agent-cmd-' + stepItem.step ? (
-                            <Check size={11} className="text-emerald-400" />
+                            <Check size={11} className="text-emerald-500" />
                           ) : (
                             <Copy size={11} />
                           )}
@@ -1385,7 +1385,7 @@ export default function AICopilot({
                   <div className="pt-0.5">
                     <button
                       onClick={() => toggleOutputExpand(stepItem.step)}
-                      className="text-[10px] text-gray-400 hover:text-cyan-300 flex items-center space-x-1 transition"
+                      className="text-[10px] text-slate-500 hover:text-cyan-600 dark:text-gray-400 dark:hover:text-cyan-300 flex items-center space-x-1 transition"
                     >
                       <span>
                         终端实际输出 ({stepItem.output.split('\n').filter(Boolean).length} 行)
@@ -1397,7 +1397,7 @@ export default function AICopilot({
                       )}
                     </button>
                     {expandedOutputs[stepItem.step] && (
-                      <pre className="mt-1 bg-[#05070a] border border-[#21262d] rounded p-2 text-[10px] font-mono text-gray-300 max-h-40 overflow-y-auto whitespace-pre-wrap break-all leading-tight">
+                      <pre className="mt-1 bg-slate-900 dark:bg-[#05070a] border border-slate-700 dark:border-[#21262d] rounded p-2 text-[10px] font-mono text-slate-200 dark:text-gray-300 max-h-40 overflow-y-auto whitespace-pre-wrap break-all leading-tight">
                         {stepItem.output}
                       </pre>
                     )}
@@ -1408,22 +1408,22 @@ export default function AICopilot({
 
             {/* 🏆 最终总结报告卡片 */}
             {agentFinalReport && (
-              <div className="bg-gradient-to-b from-emerald-950/40 to-[#0d1117] border border-emerald-600/70 rounded-lg p-3 space-y-2.5 animate-in fade-in shadow-lg">
-                <div className="flex items-center justify-between border-b border-emerald-900/50 pb-1.5">
-                  <div className="flex items-center space-x-1.5 text-emerald-400 font-bold text-xs">
+              <div className="bg-gradient-to-b from-emerald-50/80 to-white dark:from-emerald-950/40 dark:to-[#0d1117] border border-emerald-300 dark:border-emerald-600/70 rounded-lg p-3 space-y-2.5 animate-in fade-in shadow-lg">
+                <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-900/50 pb-1.5">
+                  <div className="flex items-center space-x-1.5 text-emerald-700 dark:text-emerald-400 font-bold text-xs">
                     <CheckCircle2 size={15} />
                     <span>排查总结与最终报告</span>
                   </div>
-                  <span className="text-[10px] text-emerald-300/80 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300/80 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                     共耗费 {agentSteps.length} 步
                   </span>
                 </div>
-                <div className="text-gray-200 text-[11px] leading-relaxed whitespace-pre-wrap bg-[#161b22] p-2.5 rounded border border-emerald-900/40">
+                <div className="text-slate-800 dark:text-gray-200 text-[11px] leading-relaxed whitespace-pre-wrap bg-white dark:bg-[#161b22] p-2.5 rounded border border-slate-200 dark:border-emerald-900/40">
                   {agentFinalReport}
                 </div>
                 <button
                   onClick={resetAgentSession}
-                  className="w-full py-1.5 bg-[#21262d] hover:bg-[#30363d] text-cyan-300 rounded text-xs font-medium transition border border-cyan-800/40 flex items-center justify-center space-x-1"
+                  className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] dark:hover:bg-[#30363d] text-cyan-700 dark:text-cyan-300 rounded text-xs font-medium transition border border-slate-200 dark:border-cyan-800/40 flex items-center justify-center space-x-1"
                 >
                   <RefreshCw size={12} />
                   <span>开启下一项排查任务</span>
@@ -1437,25 +1437,25 @@ export default function AICopilot({
       {/* 参数详解弹窗 */}
       {explainingCmd && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-[#30363d] rounded-lg w-full max-w-md p-4 space-y-3 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-[#30363d] pb-2">
-              <span className="font-semibold text-xs text-white">📖 命令参数详解</span>
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-lg w-full max-w-md p-4 space-y-3 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-200 dark:border-[#30363d] pb-2">
+              <span className="font-semibold text-xs text-slate-800 dark:text-white">📖 命令参数详解</span>
               <button
                 onClick={() => setExplainingCmd(null)}
-                className="text-gray-400 hover:text-white text-xs"
+                className="text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-white text-xs"
               >
                 ✕
               </button>
             </div>
-            <div className="bg-[#0d1117] p-2 rounded font-mono text-xs text-cyan-300 break-all">
+            <div className="bg-slate-900 dark:bg-[#0d1117] p-2 rounded font-mono text-xs text-cyan-300 break-all">
               {explainingCmd}
             </div>
-            <div className="max-h-60 overflow-y-auto text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">
+            <div className="max-h-60 overflow-y-auto text-xs text-slate-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
               {explainLoading ? '正在分析参数细节...' : explanationText}
             </div>
             <button
               onClick={() => setExplainingCmd(null)}
-              className="w-full py-1.5 bg-[#21262d] hover:bg-[#30363d] text-white text-xs rounded transition"
+              className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] dark:hover:bg-[#30363d] text-slate-700 dark:text-white text-xs rounded transition font-medium"
             >
               关闭
             </button>
@@ -1466,29 +1466,29 @@ export default function AICopilot({
       {/* 🔴 高危操作二次确认模态框 */}
       {pendingDangerousCmd && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none">
-          <div className="bg-[#161b22] border-2 border-red-500 rounded-lg w-full max-w-md p-4 space-y-3 shadow-2xl">
-            <div className="flex items-center space-x-2 text-red-500 font-bold text-sm">
+          <div className="bg-white dark:bg-[#161b22] border-2 border-red-500 rounded-lg w-full max-w-md p-4 space-y-3 shadow-2xl">
+            <div className="flex items-center space-x-2 text-red-600 dark:text-red-500 font-bold text-sm">
               <AlertTriangle size={18} />
               <span>检测到极度高危命令拦截！</span>
             </div>
-            <div className="bg-[#0d1117] border border-red-900/80 p-2.5 rounded font-mono text-xs text-red-400 break-all">
+            <div className="bg-red-50 dark:bg-[#0d1117] border border-red-200 dark:border-red-900/80 p-2.5 rounded font-mono text-xs text-red-700 dark:text-red-400 break-all">
               {pendingDangerousCmd}
             </div>
-            <p className="text-xs text-gray-300 leading-relaxed">
+            <p className="text-xs text-slate-700 dark:text-gray-300 leading-relaxed">
               该命令包含递归销毁、磁盘覆写或严重安全破坏风险！为保护你的服务器数据，请输入{' '}
-              <b className="text-white">yes</b> 以确认强行执行。
+              <b className="text-slate-900 dark:text-white">yes</b> 以确认强行执行。
             </p>
             <input
               type="text"
               value={dangerousConfirmInput}
               onChange={(e) => setDangerousConfirmInput(e.target.value)}
               placeholder="输入 yes 以确认"
-              className="w-full bg-[#0d1117] border border-red-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none"
+              className="w-full bg-slate-50 dark:bg-[#0d1117] border border-red-300 dark:border-red-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none"
             />
             <div className="flex space-x-2 pt-1">
               <button
                 onClick={() => setPendingDangerousCmd(null)}
-                className="flex-1 py-1.5 bg-[#21262d] hover:bg-[#30363d] text-gray-300 rounded text-xs transition"
+                className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] dark:hover:bg-[#30363d] text-slate-700 dark:text-gray-300 rounded text-xs transition"
               >
                 取消
               </button>

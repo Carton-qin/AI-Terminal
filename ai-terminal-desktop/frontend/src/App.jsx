@@ -96,10 +96,18 @@ export default function App() {
       })
       const data = await res.json()
       const newTabId = 'tab-' + Date.now()
+      const osLabel =
+        data.os_label ||
+        (navigator.userAgent.includes('Win')
+          ? 'Windows'
+          : navigator.userAgent.includes('Mac')
+          ? 'macOS'
+          : 'Linux')
       const newTab = {
         id: newTabId,
         sessionId: data.session_id,
-        title: '本地终端 (macOS)',
+        title: data.name || `本地终端 (${osLabel})`,
+        osLabel: osLabel,
         type: 'local',
       }
       setTabs((prev) => [...prev, newTab])
@@ -108,10 +116,10 @@ export default function App() {
         [newTabId]: [
           {
             id: 'welcome-' + newTabId,
-            userQuery: '本地 macOS 会话',
+            userQuery: `本地 ${osLabel} 会话`,
             isCommand: false,
             explanation:
-              '已连接本地终端。AI Copilot 已感知 macOS 环境，输入自然语言即可生成兼容的 Shell 命令。',
+              `已连接本地终端。AI Copilot 已感知 ${osLabel} 环境，输入自然语言即可生成兼容的 Shell 命令。`,
           },
         ],
       }))
@@ -322,7 +330,7 @@ export default function App() {
         body: JSON.stringify({
           query: prompt,
           session_id: currentTab.sessionId,
-          os_info: currentTab.type === 'ssh' ? `远程 VPS Linux (${currentTab.ip || currentTab.host?.ip})` : '本地 macOS',
+          os_info: currentTab.type === 'ssh' ? `远程 VPS Linux (${currentTab.ip || currentTab.host?.ip})` : `本地 ${currentTab.osLabel || '系统'}`,
         }),
       })
       const data = await res.json()

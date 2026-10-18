@@ -1097,7 +1097,15 @@ if DIST_DIR.exists():
             if target_file.name == "index.html" or not full_path.startswith("assets/"):
                 return FileResponse(target_file, headers=no_cache_headers)
             return FileResponse(target_file)
-        return FileResponse(DIST_DIR / "index.html", headers=no_cache_headers)
+
+        # 静态资源不存在时返回 404，避免返回 index.html 导致浏览器 MIME-type 脚本执行阻断
+        if full_path.startswith("assets/") or target_file.suffix in {".js", ".css", ".map", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".json"}:
+            raise HTTPException(status_code=404, detail="Asset not found")
+
+        index_file = DIST_DIR / "index.html"
+        if index_file.is_file():
+            return FileResponse(index_file, headers=no_cache_headers)
+        raise HTTPException(status_code=404, detail="Index file not found")
 
 
 if __name__ == "__main__":

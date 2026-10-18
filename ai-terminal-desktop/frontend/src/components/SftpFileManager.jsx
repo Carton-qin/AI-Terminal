@@ -86,6 +86,8 @@ export default function SftpFileManager({
   const [parentPath, setParentPath] = useState('/')
   const [pathInput, setPathInput] = useState('.')
   const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   // 路径面包屑与直接输入模式切换
   const [isEditingPath, setIsEditingPath] = useState(false)
   const [showBookmarks, setShowBookmarks] = useState(false)

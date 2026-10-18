@@ -1,9 +1,14 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, session } = require('electron')
 const path = require('path')
 const http = require('http')
 const fs = require('fs')
 const { spawn } = require('child_process')
 const treeKill = require('tree-kill')
+
+// 保证本地回环网络请求永远不经过外部系统代理 (Clash/Surge/Shadowsocks等)
+try {
+  app.commandLine.appendSwitch('proxy-bypass-list', '<local>;127.0.0.1;localhost;*.local')
+} catch (e) {}
 
 const BACKEND_PORT = 8765
 let mainWindow = null
@@ -53,34 +58,70 @@ if (!gotTheLock) {
   })
 }
 
-// 轻量级探活探针 (毫秒级响应)
+// 清理占用目标端口的僵尸进程 (针对之前异常退出遗留的孤儿进程)
+function killPortOccupant(port) {
+  try {
+    if (process.platform === 'win32') {
+      const output = require('child_process').execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf8' })
+      const lines = output.trim().split('\n')
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/)
+        const pid = parts[parts.length - 1]
+        if (pid && !isNaN(pid) && parseInt(pid, 10) > 0 && parseInt(pid, 10) !== process.pid) {
+          appendLog(`清理端口 ${port} 僵尸进程 PID: ${pid}`)
+          try { require('child_process').execSync(`taskkill /F /PID ${pid}`) } catch (err) {}
+        }
+      }
+    } else {
+      const output = require('child_process').execSync(`lsof -ti :${port}`, { encoding: 'utf8' })
+      const pids = output.trim().split(/\s+/).filter(Boolean)
+      for (const pid of pids) {
+        if (parseInt(pid, 10) !== process.pid) {
+          appendLog(`清理端口 ${port} 僵尸进程 PID: ${pid}`)
+          try { process.kill(parseInt(pid, 10), 'SIGKILL') } catch (err) {}
+        }
+      }
+    }
+  } catch (e) {
+    // 端口未被占用或查询命令无输出
+  }
+}
+
+// 轻量级探活探针 (必须确保 HTTP 状态码为 200 且返回正常健康标识，不能将 400 代理拦截或 404 当成服务就绪)
 function checkBackendHealth(timeoutMs = 1500) {
   return new Promise((resolve) => {
+    let finished = false
+    const done = (val) => {
+      if (!finished) {
+        finished = true
+        resolve(val)
+      }
+    }
+
     const req = http.get(`http://127.0.0.1:${BACKEND_PORT}/api/health`, (res) => {
-      if (res.statusCode >= 200 && res.statusCode < 500) {
-        resolve(true)
+      if (res.statusCode === 200) {
+        let body = ''
+        res.on('data', (chunk) => { body += chunk })
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(body)
+            done(data && (data.status === 'ok' || data.status === 'healthy'))
+          } catch (e) {
+            done(true)
+          }
+        })
       } else {
-        resolve(false)
+        done(false)
       }
     })
+
     req.on('error', () => {
-      // 降级尝试备用路径 /health 或 /api/hosts
-      const fallbackReq = http.get(`http://127.0.0.1:${BACKEND_PORT}/api/hosts`, (res2) => {
-        if (res2.statusCode >= 200 && res2.statusCode < 500) {
-          resolve(true)
-        } else {
-          resolve(false)
-        }
-      })
-      fallbackReq.on('error', () => resolve(false))
-      fallbackReq.setTimeout(timeoutMs, () => {
-        fallbackReq.destroy()
-        resolve(false)
-      })
+      done(false)
     })
+
     req.setTimeout(timeoutMs, () => {
       req.destroy()
-      resolve(false)
+      done(false)
     })
   })
 }
@@ -151,6 +192,9 @@ async function startBackendService(onStatusUpdate = null) {
     if (onStatusUpdate) onStatusUpdate('后端服务已就绪')
     return true
   }
+
+  // 清理端口可能残留的未释放僵尸进程
+  killPortOccupant(BACKEND_PORT)
 
   const backendConfig = getBackendExecutable()
   if (!backendConfig) {
@@ -460,6 +504,20 @@ function createMainWindow() {
     mainWindow.show()
   })
 
+  // 转发渲染进程的日志与错误到日志文件，避免静默黑屏/异常
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    const levelStr = ['DEBUG', 'INFO', 'WARN', 'ERROR'][level] || 'LOG'
+    appendLog(`[Renderer ${levelStr}] ${message} (${sourceId}:${line})`)
+  })
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    appendLog(`[Renderer Load Error] code ${errorCode}: ${errorDescription} on ${validatedURL}`)
+  })
+
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    appendLog(`[Renderer Crashed] reason: ${details.reason}, exitCode: ${details.exitCode}`)
+  })
+
   // 首先加载内置启动过渡界面
   mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(getSplashHtml()))
 
@@ -483,8 +541,14 @@ async function launchSequence() {
         await mainWindow.webContents.session.clearCache()
       } catch (e) {}
 
+      // 快捷键支持：F12 / Cmd+Option+I (Mac) / Ctrl+Shift+I (Win) 打开开发者工具；F5 / Cmd+R 强刷
       mainWindow.webContents.on('before-input-event', (event, input) => {
-        if ((input.control || input.meta) && input.key.toLowerCase() === 'r') {
+        const isMac = process.platform === 'darwin'
+        const isCmdOrCtrl = isMac ? input.meta : input.control
+        if (input.key === 'F12' || ((input.alt || input.shift) && isCmdOrCtrl && input.key.toLowerCase() === 'i')) {
+          mainWindow.webContents.toggleDevTools()
+        }
+        if (input.key === 'F5' || (isCmdOrCtrl && input.key.toLowerCase() === 'r')) {
           mainWindow.webContents.session.clearCache().then(() => {
             mainWindow.loadURL(`http://127.0.0.1:${BACKEND_PORT}`, {
               extraHeaders: 'pragma: no-cache\ncache-control: no-cache\n',
@@ -548,7 +612,13 @@ ipcMain.on('backend-open-log', () => {
   }
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    if (session && session.defaultSession) {
+      await session.defaultSession.setProxy({ proxyBypassRules: '<local>;127.0.0.1;localhost;*.local' })
+    }
+  } catch (e) {}
+
   launchSequence()
 
   app.on('activate', () => {

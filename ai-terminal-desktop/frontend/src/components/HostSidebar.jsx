@@ -200,7 +200,7 @@ export default function HostSidebar({
         {isCreatingGroup && (
           <form
             onSubmit={handleCreateGroupSubmit}
-            className="p-2 bg-[#0d1117] border border-cyan-500/50 rounded-lg space-y-1.5 animate-in fade-in"
+            className="p-2 bg-white dark:bg-[#0d1117] border border-cyan-500/50 rounded-lg space-y-1.5 animate-in fade-in shadow-2xs"
           >
             <div className="flex items-center space-x-1">
               <input
@@ -208,7 +208,7 @@ export default function HostSidebar({
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 placeholder="输入分组名称 (如: 美西CN2)"
-                className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
+                className="flex-1 bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded px-2 py-1 text-xs text-slate-800 dark:text-white focus:outline-none focus:border-cyan-400"
                 autoFocus
               />
               <button
@@ -221,7 +221,7 @@ export default function HostSidebar({
               <button
                 type="button"
                 onClick={() => setIsCreatingGroup(false)}
-                className="p-1 bg-[#21262d] hover:bg-[#30363d] text-gray-400 rounded text-xs"
+                className="p-1 bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] dark:hover:bg-[#30363d] text-slate-600 dark:text-gray-400 rounded text-xs"
                 title="取消"
               >
                 <X size={13} />
@@ -466,7 +466,7 @@ export default function HostSidebar({
           <ShieldCheck size={14} className="text-emerald-500 dark:text-emerald-400" />
           <span>三级安全审计已开启</span>
         </div>
-        <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono">v1.0.4</span>
+        <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono">v1.0.5</span>
       </div>
     </aside>
   )

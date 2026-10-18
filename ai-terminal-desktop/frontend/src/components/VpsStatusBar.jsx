@@ -87,8 +87,8 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
 
   return (
     <div className="bg-slate-50/95 dark:bg-[#12161f]/95 border-b border-slate-200/80 dark:border-[#30363d]/80 text-xs select-none backdrop-blur-md transition-colors shrink-0 text-slate-700 dark:text-gray-300">
-      {/* 1. 精致胶囊式紧凑状态栏 */}
-      <div className="h-8 px-3 flex items-center justify-between space-x-2 overflow-x-auto text-[11px] no-scrollbar">
+      {/* 1. 精致胶囊式紧凑状态栏 (自适应折行，杜绝横向滚动条) */}
+      <div className="min-h-[34px] px-3 py-1 flex flex-wrap items-center justify-between gap-y-1 gap-x-2 text-[11px]">
         {/* 左侧：主机标识 */}
         <div className="flex items-center space-x-1.5 shrink-0 pr-2 border-r border-slate-200 dark:border-white/10">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -97,8 +97,8 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
           </span>
         </div>
 
-        {/* 中间指标条目 */}
-        <div className="flex items-center space-x-2 min-w-0 flex-1 overflow-x-auto py-0.5 no-scrollbar">
+        {/* 中间指标条目 (自适应换行，无横向滚动条) */}
+        <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
           {/* CPU */}
           <div
             className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/10 shrink-0 shadow-2xs"

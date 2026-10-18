@@ -817,21 +817,21 @@ export default function AICopilot({
 
       {/* 🚨 终端报错智能自愈快捷横幅 */}
       {activeError && (
-        <div className="mx-2.5 my-2 p-2 bg-red-950/40 border border-red-700/70 rounded-lg text-xs space-y-1.5 animate-in fade-in">
+        <div className="mx-2.5 my-2 p-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-700/70 rounded-lg text-xs space-y-1.5 animate-in fade-in">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5 text-red-300 font-semibold text-[11px] truncate">
-              <AlertTriangle size={13} className="text-red-400 shrink-0 animate-pulse" />
+            <div className="flex items-center space-x-1.5 text-red-700 dark:text-red-300 font-semibold text-[11px] truncate">
+              <AlertTriangle size={13} className="text-red-500 dark:text-red-400 shrink-0 animate-pulse" />
               <span>检测到终端报错</span>
             </div>
             <button
               onClick={onClearActiveError}
-              className="text-gray-400 hover:text-gray-200 p-0.5"
+              className="text-slate-400 hover:text-slate-700 dark:text-gray-400 dark:hover:text-gray-200 p-0.5"
               title="忽略"
             >
               <X size={12} />
             </button>
           </div>
-          <div className="font-mono text-[10px] text-red-300/90 bg-[#161b22] px-2 py-1 rounded truncate border border-red-900/40">
+          <div className="font-mono text-[10px] text-red-800 dark:text-red-300/90 bg-red-100/70 dark:bg-[#161b22] px-2 py-1 rounded truncate border border-red-200 dark:border-red-900/40">
             {activeError}
           </div>
           <div className="flex space-x-1.5 pt-0.5">
@@ -1075,14 +1075,14 @@ export default function AICopilot({
       {/* Tab 2: 报错自动排查自愈 */}
       {activeSubTab === 'diagnose' && (
         <div className="flex-1 overflow-y-auto p-3 space-y-3 text-xs">
-          <div className="bg-[#0d1117] border border-[#30363d] rounded-lg p-3 space-y-2">
-            <div className="font-semibold text-gray-200 flex items-center space-x-1.5">
-              <Stethoscope size={15} className="text-red-400" />
+          <div className="bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d] rounded-lg p-3 space-y-2 shadow-2xs">
+            <div className="font-semibold text-slate-800 dark:text-gray-200 flex items-center space-x-1.5">
+              <Stethoscope size={15} className="text-red-500 dark:text-red-400" />
               <span>智能终端报错自愈</span>
             </div>
-            <p className="text-[11px] text-gray-400 leading-relaxed">
+            <p className="text-[11px] text-slate-600 dark:text-gray-400 leading-relaxed">
               当命令在当前终端中执行失败或报错时，点击下方按钮，AI 将抓取当前终端视口日志，针对{' '}
-              <b className="text-cyan-400">{currentEnvLabel}</b> 分析根本原因并给出精准修复方案。
+              <b className="text-cyan-600 dark:text-cyan-400">{currentEnvLabel}</b> 分析根本原因并给出精准修复方案。
             </p>
             <button
               onClick={triggerDiagnose}
@@ -1099,12 +1099,12 @@ export default function AICopilot({
           </div>
 
           {diagResult && (
-            <div className="bg-[#0d1117] border border-red-900/60 rounded-lg p-3 space-y-3 animate-fade-in">
+            <div className="bg-white dark:bg-[#0d1117] border border-red-200 dark:border-red-900/60 rounded-lg p-3 space-y-3 animate-fade-in shadow-2xs">
               <div>
-                <span className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">
+                <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wider">
                   根本原因分析:
                 </span>
-                <p className="mt-1 text-gray-200 leading-relaxed text-[11px]">
+                <p className="mt-1 text-slate-800 dark:text-gray-200 leading-relaxed text-[11px]">
                   {diagResult.root_cause}
                 </p>
               </div>
@@ -1112,19 +1112,19 @@ export default function AICopilot({
               {diagResult.fix_command && (
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-emerald-400 font-semibold uppercase tracking-wider">
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold uppercase tracking-wider">
                       🛠️ 推荐修复命令:
                     </span>
                     {diagResult.autoExecuted && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950/70 text-cyan-300 border border-cyan-800 font-mono">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950/70 text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 font-mono">
                         ⚡ 已自动执行修复
                       </span>
                     )}
                   </div>
-                  <div className="bg-[#161b22] border border-[#30363d] rounded p-2 font-mono text-[11px] text-emerald-300 break-all">
+                  <div className="bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded p-2 font-mono text-[11px] text-emerald-700 dark:text-emerald-300 break-all">
                     {diagResult.fix_command}
                   </div>
-                  <div className="text-gray-400 text-[11px] leading-relaxed">
+                  <div className="text-slate-600 dark:text-gray-400 text-[11px] leading-relaxed">
                     {diagResult.explanation}
                   </div>
                   <button

@@ -59,13 +59,15 @@ class SSHSession:
                     pass
 
         self.client.connect(
-            hostname=self.host,
-            port=self.port,
-            username=self.username,
+            hostname=self.host.strip() if isinstance(self.host, str) else self.host,
+            port=int(self.port) if self.port else 22,
+            username=self.username.strip() if isinstance(self.username, str) else self.username,
             password=self.password if not pkey else None,
             pkey=pkey,
             timeout=15,
             banner_timeout=30,
+            look_for_keys=(pkey is not None),
+            allow_agent=(pkey is not None),
         )
 
         # 启用 TCP_NODELAY，禁用 Nagle 缓冲算法，消除 40~200ms 交互延迟

@@ -527,32 +527,35 @@ export default function TerminalTabs({
 
     ws.onmessage = (event) => {
       // 0. 控制信令拦截 (SSH 连通 / 握手失败)
-      if (typeof event.data === 'string' && event.data.startsWith('{') && event.data.endsWith('}')) {
-        try {
-          const ctrl = JSON.parse(event.data)
-          if (ctrl.type === 'ssh_connected') {
-            tab._sshConnected = true
-            tab._sshFailed = false
-            if (isReconnection) {
-              term.write('\r\n\x1b[32m[✓ 自动重连成功！已恢复会话连接]\x1b[0m\r\n')
+      if (typeof event.data === 'string') {
+        const trimmed = event.data.trim()
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const ctrl = JSON.parse(trimmed)
+            if (ctrl.type === 'ssh_connected') {
+              tab._sshConnected = true
+              tab._sshFailed = false
+              if (isReconnection) {
+                term.write('\r\n\x1b[32m[✓ 自动重连成功！已恢复会话连接]\x1b[0m\r\n')
+              }
+              setReconnectStates((prev) => {
+                const next = { ...prev }
+                delete next[id]
+                return next
+              })
+              return
+            } else if (ctrl.type === 'ssh_connect_failed') {
+              tab._sshConnected = false
+              tab._sshFailed = true
+              // 目标不可达或认证失败，终止死循环自动重试，等待用户排障后手动重试
+              setReconnectStates((prev) => ({
+                ...prev,
+                [id]: { attempt: 5, maxAttempts: 5, countdown: 0, failed: true, reason: ctrl.error },
+              }))
+              return
             }
-            setReconnectStates((prev) => {
-              const next = { ...prev }
-              delete next[id]
-              return next
-            })
-            return
-          } else if (ctrl.type === 'ssh_connect_failed') {
-            tab._sshConnected = false
-            tab._sshFailed = true
-            // 目标不可达或认证失败，终止死循环自动重试，等待用户排障后手动重试
-            setReconnectStates((prev) => ({
-              ...prev,
-              [id]: { attempt: 5, maxAttempts: 5, countdown: 0, failed: true, reason: ctrl.error },
-            }))
-            return
-          }
-        } catch (e) {}
+          } catch (e) {}
+        }
       }
 
       // 1. 零延迟即时送入终端渲染，由 xterm 内部高性能引擎处理，不占用任何 JS 堆栈
@@ -973,8 +976,8 @@ export default function TerminalTabs({
           </div>
         ) : (
           <>
-            {/* 终端专属操作与状态栏 (Terminal Action Bar - 水平整齐不折行) */}
-            <div className="h-10 border-b border-slate-200/80 dark:border-white/5 flex items-center justify-between px-3 text-xs bg-white/80 dark:bg-[#161b22]/90 shrink-0 backdrop-blur-md transition-colors gap-2 overflow-x-auto no-scrollbar">
+            {/* 终端专属操作与状态栏 (Terminal Action Bar - 响应式优雅折行，无横向滚动条) */}
+            <div className="min-h-[40px] border-b border-slate-200/80 dark:border-white/5 flex flex-wrap items-center justify-between px-3 py-1.5 text-xs bg-white/80 dark:bg-[#161b22]/90 shrink-0 backdrop-blur-md transition-colors gap-y-1.5 gap-x-2 shadow-2xs">
               {/* 左侧：主机信息与在线状态 */}
               <div className="flex items-center space-x-2 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>

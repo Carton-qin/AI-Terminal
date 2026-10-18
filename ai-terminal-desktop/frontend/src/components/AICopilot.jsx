@@ -513,12 +513,14 @@ export default function AICopilot({
   }
 
   // 提交自然语言查询
-  const handleSend = async (e) => {
+  const handleSend = async (e, customQuery = null) => {
     e?.preventDefault()
-    if (!query.trim() || loading) return
+    const currentQuery = (typeof customQuery === 'string' ? customQuery : query).trim()
+    if (!currentQuery || loading) return
 
-    const currentQuery = query.trim()
-    setQuery('')
+    if (!customQuery) {
+      setQuery('')
+    }
     setLoading(true)
 
     // 提取当前 Tab 独有的近期上下文对话记录
@@ -529,6 +531,9 @@ export default function AICopilot({
         { role: 'user', content: c.userQuery },
         { role: 'assistant', content: c.command },
       ])
+
+    // 实时读取当前终端屏幕输出与视口日志，注入给 AI 模型
+    const screenBuffer = onReadScreenBuffer ? onReadScreenBuffer() : ''
 
     try {
       const res = await fetch('http://127.0.0.1:8765/api/ai/ask', {
@@ -541,6 +546,7 @@ export default function AICopilot({
             sessionDetails?.os_info ||
             (targetTab?.type === 'ssh' ? `远程 VPS Linux (${targetTab?.ip || targetTab?.host?.ip})` : `本地 ${targetTab?.osLabel || '系统'}`),
           history: historyList,
+          screen_buffer: screenBuffer,
         }),
       })
       const data = await res.json()
@@ -1048,6 +1054,37 @@ export default function AICopilot({
             ))}
           </div>
 
+          {/* 终端实时视口感知状态与快速诊断胶囊 */}
+          <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-[#161b22] border-t border-slate-200 dark:border-[#30363d] flex items-center justify-between text-[11px] select-none">
+            <div className="flex items-center space-x-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-[10px]">终端屏幕实时感知中</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <button
+                type="button"
+                onClick={() => handleSend(null, '请直接读取当前终端屏幕输出中的报错内容，分析具体失败根因并生成针对性修复命令')}
+                disabled={loading}
+                className="px-2 py-0.5 rounded text-[10px] bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-900/60 transition flex items-center space-x-1 disabled:opacity-50"
+                title="一键直接感知终端中的报错并生成修复命令"
+              >
+                <span>⚡ 诊断终端报错</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSend(null, '请直接读取当前终端屏幕输出内容，为我解读运行状态与指标')}
+                disabled={loading}
+                className="px-2 py-0.5 rounded text-[10px] bg-cyan-50 hover:bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:hover:bg-cyan-900/40 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-900/60 transition flex items-center space-x-1 disabled:opacity-50"
+                title="一键解读当前终端屏幕内容"
+              >
+                <span>🔍 解读终端输出</span>
+              </button>
+            </div>
+          </div>
+
           {/* 底部输入框 */}
           <form
             onSubmit={handleSend}
@@ -1057,7 +1094,7 @@ export default function AICopilot({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`在 ${currentEnvLabel} 中提问，如 '系统开启bbr了吗' ...`}
+              placeholder={`在 ${currentEnvLabel} 中提问或诊断，支持自动读取终端内容...`}
               className="flex-1 bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-md px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 transition"
               disabled={loading}
             />

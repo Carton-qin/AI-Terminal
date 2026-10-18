@@ -90,12 +90,18 @@ class AIService:
         query: str,
         os_info: Optional[Union[dict, str]] = None,
         history: Optional[List[dict]] = None,
+        screen_buffer: Optional[str] = None,
     ) -> Dict[str, Any]:
         """根据自然语言需求生成命令与安全评估"""
         context = get_current_context()
         self._apply_os_info(context, os_info)
 
-        proposal = self.llm.ask_command(user_input=query, context=context, history=history)
+        proposal = self.llm.ask_command(
+            user_input=query,
+            context=context,
+            history=history,
+            screen_buffer=screen_buffer,
+        )
 
         risk_data = None
         if proposal.command:

@@ -69,6 +69,12 @@ SYSTEM_PROMPT_TEMPLATE = """你是一个顶级的 Linux/Unix 系统架构师与�
 - 常用环境与面板: Docker (`curl -fsSL https://get.docker.com | bash`), 哪吒监控 (`curl -L https://raw.githubusercontent.com/naiba/nezha/master/script/install.sh -o nezha.sh && chmod +x nezha.sh && sudo ./nezha.sh`), 科技lion (`apt update -y && apt install -y curl && bash <(curl -sL kejilion.sh)`)
 - 硬件巡检: 独立服务器硬件/硬盘通电时间检测 `curl -sL https://sick.onl | bash`
 - 禁用 IPv6: `echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.conf && echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.conf && echo "net.ipv6.conf.lo.disable_ipv6 = 1" >> /etc/sysctl.conf && sysctl -p`
+7. 【实时终端感知与报错排查能力】：
+系统会实时为你注入用户当前终端窗口中正在显示的实际视口屏幕输出与历史日志（若有提供）。你拥有完全直接读取当前终端屏幕内容的能力！
+当用户提问包含“看当前终端内容”、“帮我看报错”、“为什么执行失败”、“怎么解决”、“如何修复”、“看看输出”或直接询问命令执行情况时：
+- 绝对禁止回答“我无法直接读取您终端窗口里面的实时输出内容”或“只能看到您发送给我的文字”等类似推脱之辞！
+- 必须直接基于系统注入的【用户当前活动终端的实时屏幕输出与运行日志】，仔细排查其中的具体报错信息（如：dpkg/apt 依赖与文件冲突、权限不足 Permission denied、端口已被占用 Address already in use、未找到命令 command not found、配置文件语法错误等）。
+- 明确指出根本原因，并生成能够直接解决该报错的修复命令（command 字段填入修复命令，type 设为 "command"），并在 explanation 中说明排障逻辑。
 """
 
 DIAGNOSTIC_PROMPT_TEMPLATE = """用户在终端执行了一条命令，但是执行失败了。请作为 Linux 系统诊断专家进行故障排查。
@@ -223,6 +229,7 @@ class LLMClient:
         user_input: str,
         context: SystemContext,
         history: Optional[List[dict]] = None,
+        screen_buffer: Optional[str] = None,
     ) -> CommandProposal:
         """根据用户输入与上下文生成建议命令"""
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
@@ -232,6 +239,21 @@ class LLMClient:
         )
 
         messages = [{"role": "system", "content": system_prompt}]
+        if screen_buffer and screen_buffer.strip():
+            # 截取最近 4000 字符的终端输出，保护 Token 与性能
+            truncated_buf = screen_buffer.strip()
+            if len(truncated_buf) > 4000:
+                truncated_buf = truncated_buf[-4000:]
+            screen_context = (
+                "【用户当前活动终端的实时屏幕输出与运行日志】\n"
+                "以下是用户当前终端窗口中实际显示的最新日志（包含执行的命令与报错信息）：\n"
+                "```\n"
+                f"{truncated_buf}\n"
+                "```\n"
+                "【提示】：你拥有完全直接读取上述终端屏幕日志的能力。请直接结合这些输出回答或排查，绝对禁止回答无法读取终端。"
+            )
+            messages.append({"role": "system", "content": screen_context})
+
         if history:
             messages.extend(history)
         messages.append({"role": "user", "content": user_input})

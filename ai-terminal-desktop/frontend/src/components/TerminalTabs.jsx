@@ -866,7 +866,7 @@ export default function TerminalTabs({
     })
   }, [activeTabId, onRegisterInjectHandler])
 
-  // 注册缓冲区读取 (直接读取 xterm 原生活动屏缓冲区，零开销、零正则损耗)
+  // 注册缓冲区读取 (直接读取 xterm 原生活动屏缓冲区，提取最近有效输出，零开销、零正则损耗)
   useEffect(() => {
     onRegisterBufferReader(() => {
       if (!activeTabId) return ''
@@ -874,12 +874,19 @@ export default function TerminalTabs({
       if (item && item.term) {
         const buf = item.term.buffer.active
         const lines = []
-        const start = Math.max(0, buf.length - 80)
-        for (let i = start; i < buf.length; i++) {
+        const total = buf.length
+        const start = Math.max(0, total - 150)
+        for (let i = start; i < total; i++) {
           const line = buf.getLine(i)
-          if (line) lines.push(line.translateToString(true))
+          if (line) {
+            lines.push(line.translateToString(true))
+          }
         }
-        return lines.join('\n').trim()
+        // 过滤尾部连续空行
+        while (lines.length > 0 && !lines[lines.length - 1].trim()) {
+          lines.pop()
+        }
+        return lines.join('\n')
       }
       return ''
     })

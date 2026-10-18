@@ -401,6 +401,7 @@ export default function App() {
     }))
 
     try {
+      const screenBuffer = handleReadScreenBuffer()
       const res = await fetch('http://127.0.0.1:8765/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -408,6 +409,7 @@ export default function App() {
           query: prompt,
           session_id: currentTab.sessionId,
           os_info: currentTab.type === 'ssh' ? `远程 VPS Linux (${currentTab.ip || currentTab.host?.ip})` : `本地 ${currentTab.osLabel || '系统'}`,
+          screen_buffer: screenBuffer,
         }),
       })
       const data = await res.json()

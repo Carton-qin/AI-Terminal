@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import platform
+import re
+import sys
 import uuid
 from typing import Any, Dict, List, Optional, Union
 
@@ -74,6 +77,7 @@ class AIAskRequest(BaseModel):
     session_id: Optional[str] = None
     os_info: Optional[Union[dict, str]] = None
     history: Optional[list] = None
+    screen_buffer: Optional[str] = None
 
 
 class AIDiagnoseRequest(BaseModel):
@@ -392,6 +396,19 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
 
     async def send_to_client(data: bytes):
         try:
+            # 记录终端输出到 session_info 的滚动缓冲区中，作为 AI Copilot 感知的双重保障
+            if "output_buffer" not in session_info:
+                session_info["output_buffer"] = []
+            try:
+                decoded = data.decode("utf-8", errors="ignore")
+                clean_text = re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', decoded)
+                session_info["output_buffer"].append(clean_text)
+                total_len = sum(len(x) for x in session_info["output_buffer"])
+                while total_len > 8192 and session_info["output_buffer"]:
+                    removed = session_info["output_buffer"].pop(0)
+                    total_len -= len(removed)
+            except Exception:
+                pass
             await websocket.send_bytes(data)
         except Exception:
             pass
@@ -476,6 +493,7 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
 @app.post("/api/ai/ask")
 def ai_ask(req: AIAskRequest):
     os_info = req.os_info
+    screen_buffer = req.screen_buffer
     # 如果指定了 session_id，优先提取该终端会话真实探测到的远程操作系统信息
     if req.session_id and req.session_id in active_sessions:
         s = active_sessions[req.session_id]
@@ -483,11 +501,15 @@ def ai_ask(req: AIAskRequest):
         session_os = getattr(instance, "os_info", None) or s.get("os_info")
         if session_os:
             os_info = session_os
+        # 如果前端没有传入有效 screen_buffer，则从 session 内部维护的 output_buffer 中提取 fallback
+        if (not screen_buffer or not screen_buffer.strip()) and s.get("output_buffer"):
+            screen_buffer = "".join(s["output_buffer"])[-4000:]
 
     return ai_service.ask_command(
         query=req.query,
         os_info=os_info,
         history=req.history,
+        screen_buffer=screen_buffer,
     )
 
 

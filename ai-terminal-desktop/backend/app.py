@@ -450,7 +450,10 @@ async def websocket_terminal(websocket: WebSocket, session_id: str):
                     try:
                         cmd_obj = json.loads(text_data)
                         if cmd_obj.get("type") == "resize":
-                            terminal_instance.resize(cmd_obj["cols"], cmd_obj["rows"])
+                            cols = int(cmd_obj.get("cols", 0))
+                            rows = int(cmd_obj.get("rows", 0))
+                            if cols >= 30 and rows >= 5:
+                                terminal_instance.resize(cols, rows)
                             continue
                     except Exception:
                         pass

@@ -183,6 +183,10 @@ class SSHSession:
                 pass
 
     def resize(self, cols: int, rows: int):
+        if cols < 30 or rows < 5:
+            return
+        if self.cols == cols and self.rows == rows:
+            return
         self.cols = cols
         self.rows = rows
         if self.channel and not self.channel.closed:

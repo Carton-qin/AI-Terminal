@@ -384,17 +384,31 @@ export default function TerminalTabs({
     }
   }, [tabs, activeTabId, splitMode, splitTabId])
 
-  // 触发所有终端实例 resize fit
-  const fitAllTerminals = () => {
-    setTimeout(() => {
-      Object.values(terminalRefs.current).forEach((item) => {
-        if (item?.fitAddon) {
-          try {
-            item.fitAddon.fit()
-          } catch (e) {}
+  // 触发当前可见终端实例自适应 resize
+  // 核心原则：
+  // 1. 绝不盲目对后台隐藏的终端执行 fit()（容器尺寸为 0 会导致 xterm 计算微小列宽，触发远端 shell 折行重绘提示符）
+  // 2. 只有当前视口中可见、且容器真实 DOM 尺寸具备足够长宽时才执行自适应
+  const fitVisibleTerminals = () => {
+    const visibleIds =
+      splitMode !== 'none'
+        ? [activeTabId, splitTabId].filter(Boolean)
+        : [activeTabId].filter(Boolean)
+
+    requestAnimationFrame(() => {
+      visibleIds.forEach((id) => {
+        const item = terminalRefs.current[id]
+        const container = containerRefs.current[id]
+        if (item?.fitAddon && container) {
+          const w = container.clientWidth
+          const h = container.clientHeight
+          if (w >= 150 && h >= 80) {
+            try {
+              item.fitAddon.fit()
+            } catch (e) {}
+          }
         }
       })
-    }, 120)
+    })
   }
 
   // 确保终端元素附着在活动 DOM 容器中并自适应（解决分屏关闭窗口时终端丢失问题）
@@ -415,9 +429,7 @@ export default function TerminalTabs({
       }
     })
 
-    setTimeout(() => {
-      fitAllTerminals()
-    }, 80)
+    fitVisibleTerminals()
   }
 
   useEffect(() => {
@@ -426,16 +438,16 @@ export default function TerminalTabs({
 
   useEffect(() => {
     localStorage.setItem('aiterm_show_vps_metrics', showVpsMetrics)
-    fitAllTerminals()
-  }, [showVpsMetrics, activeTabId])
+    fitVisibleTerminals()
+  }, [showVpsMetrics])
 
   useEffect(() => {
     localStorage.setItem('aiterm_show_file_manager', showFileManager)
-    fitAllTerminals()
-  }, [showFileManager, activeTabId])
+    fitVisibleTerminals()
+  }, [showFileManager])
 
   useEffect(() => {
-    fitAllTerminals()
+    fitVisibleTerminals()
   }, [splitMode, splitTabId])
 
   // 错误关键字匹配正则
@@ -464,7 +476,9 @@ export default function TerminalTabs({
     ws.binaryType = 'arraybuffer'
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+      const initialCols = term.cols >= 30 ? term.cols : 80
+      const initialRows = term.rows >= 5 ? term.rows : 24
+      ws.send(JSON.stringify({ type: 'resize', cols: initialCols, rows: initialRows }))
       // 本地终端无需远端网络握手，直接确认重连成功
       if (isReconnection && tab.type === 'local') {
         term.write('\r\n\x1b[32m[✓ 自动重连成功！已恢复会话连接]\x1b[0m\r\n')
@@ -725,7 +739,11 @@ export default function TerminalTabs({
       term.loadAddon(fitAddon)
       term.loadAddon(new WebLinksAddon())
       term.open(container)
-      fitAddon.fit()
+      if (container.clientWidth >= 150 && container.clientHeight >= 80) {
+        try {
+          fitAddon.fit()
+        } catch (e) {}
+      }
 
       const ws = setupWebSocket(tab, term, false)
 
@@ -743,11 +761,27 @@ export default function TerminalTabs({
         }
       })
 
+      let lastCols = term.cols
+      let lastRows = term.rows
+      let resizeTimer = null
+
       term.onResize(({ cols, rows }) => {
-        const curWs = terminalRefs.current[id]?.ws
-        if (curWs && curWs.readyState === WebSocket.OPEN) {
-          curWs.send(JSON.stringify({ type: 'resize', cols, rows }))
+        // 关键防御：如果计算出的列数或行数过小（例如隐藏容器或未就绪导致 cols < 30），坚决不要向后端发送 resize！
+        // 否则远端 Bash/Zsh readline 接收到微小列宽后会强制对当前行进行折行重新排版，造成终端反复输出多行提示符！
+        if (cols < 30 || rows < 5) {
+          return
         }
+        if (cols === lastCols && rows === lastRows) return
+        lastCols = cols
+        lastRows = rows
+
+        clearTimeout(resizeTimer)
+        resizeTimer = setTimeout(() => {
+          const curWs = terminalRefs.current[id]?.ws
+          if (curWs && curWs.readyState === WebSocket.OPEN) {
+            curWs.send(JSON.stringify({ type: 'resize', cols, rows }))
+          }
+        }, 60)
       })
 
       terminalRefs.current[id] = { term, fitAddon, ws, sessionId: tab.sessionId }
@@ -779,20 +813,26 @@ export default function TerminalTabs({
   // 激活变更
   useEffect(() => {
     if (activeTabId && terminalRefs.current[activeTabId]) {
-      setTimeout(() => {
-        terminalRefs.current[activeTabId]?.fitAddon?.fit()
-        terminalRefs.current[activeTabId]?.term?.focus()
-      }, 50)
+      requestAnimationFrame(() => {
+        const item = terminalRefs.current[activeTabId]
+        const container = containerRefs.current[activeTabId]
+        if (item?.fitAddon && container && container.clientWidth >= 150 && container.clientHeight >= 80) {
+          try {
+            item.fitAddon.fit()
+          } catch (e) {}
+        }
+        item?.term?.focus()
+      })
     }
   }, [activeTabId])
 
   useEffect(() => {
     const handleResize = () => {
-      fitAllTerminals()
+      fitVisibleTerminals()
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [activeTabId])
+  }, [activeTabId, splitTabId, splitMode])
 
   // 注册命令注入
   useEffect(() => {
@@ -855,11 +895,11 @@ export default function TerminalTabs({
       const next = Math.max(12, Math.min(22, prev + delta))
       localStorage.setItem('aiterm_font_size', next.toString())
       Object.values(terminalRefs.current).forEach((item) => {
-        if (item.term && item.fitAddon) {
+        if (item.term) {
           item.term.options.fontSize = next
-          item.fitAddon.fit()
         }
       })
+      fitVisibleTerminals()
       return next
     })
   }
@@ -1048,7 +1088,7 @@ export default function TerminalTabs({
                   <button
                     onClick={() => {
                       setSplitMode('none')
-                      fitAllTerminals()
+                      fitVisibleTerminals()
                     }}
                     className={`px-2 py-1 rounded-md transition whitespace-nowrap text-xs font-medium ${
                       splitMode === 'none'
@@ -1070,7 +1110,7 @@ export default function TerminalTabs({
                         const other = tabs.find((t) => t.id !== activeTabId)
                         if (other) setSplitTabId(other.id)
                       }
-                      fitAllTerminals()
+                      fitVisibleTerminals()
                     }}
                     className={`px-2 py-1 rounded-md transition whitespace-nowrap flex items-center space-x-1 text-xs font-medium ${
                       splitMode === 'vertical'
@@ -1093,7 +1133,7 @@ export default function TerminalTabs({
                         const other = tabs.find((t) => t.id !== activeTabId)
                         if (other) setSplitTabId(other.id)
                       }
-                      fitAllTerminals()
+                      fitVisibleTerminals()
                     }}
                     className={`px-2 py-1 rounded-md transition whitespace-nowrap flex items-center space-x-1 text-xs font-medium ${
                       splitMode === 'horizontal'
@@ -1253,17 +1293,19 @@ export default function TerminalTabs({
 
                   let paneLayoutClasses = ''
                   if (splitMode === 'vertical') {
-                    paneLayoutClasses = isVisible ? 'w-1/2 h-full flex flex-col' : 'hidden'
+                    paneLayoutClasses = isVisible ? 'w-1/2 h-full flex flex-col relative' : 'hidden'
                   } else if (splitMode === 'horizontal') {
-                    paneLayoutClasses = isVisible ? 'w-full h-1/2 flex flex-col' : 'hidden'
+                    paneLayoutClasses = isVisible ? 'w-full h-1/2 flex flex-col relative' : 'hidden'
                   } else {
-                    paneLayoutClasses = isMain ? 'w-full h-full absolute inset-0 flex flex-col' : 'hidden'
+                    paneLayoutClasses = isMain
+                      ? 'w-full h-full absolute inset-0 flex flex-col z-10 visible opacity-100'
+                      : 'w-full h-full absolute inset-0 flex flex-col z-0 invisible opacity-0 pointer-events-none'
                   }
 
                   return (
                     <div
                       key={tab.id}
-                      className={`${paneLayoutClasses} rounded-xl overflow-hidden transition-all duration-150 ${
+                      className={`${paneLayoutClasses} rounded-xl overflow-hidden ${
                         splitMode !== 'none' && isVisible
                           ? isMain
                             ? 'border-2 border-cyan-500/80 shadow-md'
@@ -1338,9 +1380,13 @@ export default function TerminalTabs({
                               if (terminalRefs.current[tab.id].term.element.parentElement !== el) {
                                 el.innerHTML = ''
                                 el.appendChild(terminalRefs.current[tab.id].term.element)
-                                try {
-                                  terminalRefs.current[tab.id].fitAddon?.fit()
-                                } catch (e) {}
+                                if (el.clientWidth >= 150 && el.clientHeight >= 80) {
+                                  requestAnimationFrame(() => {
+                                    try {
+                                      terminalRefs.current[tab.id]?.fitAddon?.fit()
+                                    } catch (e) {}
+                                  })
+                                }
                               }
                             }
                           }}

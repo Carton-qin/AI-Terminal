@@ -44,6 +44,7 @@ export default function SnippetDrawer({ isOpen, onClose, onInjectCommand }) {
   const [selectedCategory, setSelectedCategory] = useState('全部')
   const [searchQuery, setSearchQuery] = useState('')
   const [copiedId, setCopiedId] = useState(null)
+  const [confirmDeleteSnipId, setConfirmDeleteSnipId] = useState(null)
 
   // 自定义命令添加/编辑弹窗
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -172,8 +173,8 @@ export default function SnippetDrawer({ isOpen, onClose, onInjectCommand }) {
   }
 
   // 删除自定义命令
-  const handleDeleteSnippet = async (snipId, snipName) => {
-    if (!confirm(`确定删除自定义常用命令「${snipName}」吗？`)) return
+  const handleDeleteSnippet = async (snipId) => {
+    setConfirmDeleteSnipId(null)
     try {
       const res = await fetch(`http://127.0.0.1:8765/api/snippets/${snipId}`, {
         method: 'DELETE',
@@ -455,13 +456,33 @@ export default function SnippetDrawer({ isOpen, onClose, onInjectCommand }) {
                               >
                                 <Edit2 size={13} />
                               </button>
-                              <button
-                                onClick={() => handleDeleteSnippet(snip.id, snip.name)}
-                                className="p-1 text-slate-400 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-[#21262d] rounded transition"
-                                title="删除自定义命令"
-                              >
-                                <Trash2 size={13} />
-                              </button>
+                              {confirmDeleteSnipId === snip.id ? (
+                                <div className="flex items-center space-x-1 animate-in fade-in" onClick={(e) => e.stopPropagation()}>
+                                  <span className="text-[10px] text-rose-500 font-medium">删除?</span>
+                                  <button
+                                    onClick={() => handleDeleteSnippet(snip.id)}
+                                    className="px-1.5 py-0.5 bg-rose-600 text-white rounded text-[10px] font-bold hover:bg-rose-500"
+                                    title="确认删除"
+                                  >
+                                    是
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteSnipId(null)}
+                                    className="px-1 py-0.5 bg-slate-200 dark:bg-[#30363d] text-slate-600 dark:text-gray-300 rounded text-[10px]"
+                                    title="取消"
+                                  >
+                                    否
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmDeleteSnipId(snip.id)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-[#21262d] rounded transition"
+                                  title="删除自定义命令"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>

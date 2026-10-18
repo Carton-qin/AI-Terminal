@@ -24,6 +24,7 @@ export default function SshKeyManagerModal({
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [copiedKeyId, setCopiedKeyId] = useState(null)
+  const [confirmDeleteKeyId, setConfirmDeleteKeyId] = useState(null)
 
   // 生成新密钥表单状态
   const [showGenerateForm, setShowGenerateForm] = useState(false)
@@ -123,9 +124,7 @@ export default function SshKeyManagerModal({
 
   // 删除密钥
   const handleDeleteKey = async (key) => {
-    if (!confirm(`确定要删除密钥 "${key.name}" 吗？注意：这不会从已部署的 VPS 中移除公钥。`)) {
-      return
-    }
+    setConfirmDeleteKeyId(null)
     try {
       const res = await fetch(`http://127.0.0.1:8765/api/keys/${key.id}`, {
         method: 'DELETE',
@@ -355,13 +354,33 @@ export default function SshKeyManagerModal({
                           <Download size={13} />
                         </button>
 
-                        <button
-                          onClick={() => handleDeleteKey(key)}
-                          className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-red-950/40 dark:hover:bg-red-900 text-rose-700 dark:text-red-300 rounded-lg text-xs transition border border-rose-200 dark:border-red-800/50"
-                          title="删除此密钥"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {confirmDeleteKeyId === key.id ? (
+                          <div className="flex items-center space-x-1 animate-in fade-in" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[10px] text-rose-500 font-medium">删除?</span>
+                            <button
+                              onClick={() => handleDeleteKey(key)}
+                              className="px-1.5 py-0.5 bg-rose-600 text-white rounded text-[10px] font-bold hover:bg-rose-500"
+                              title="确认删除"
+                            >
+                              是
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteKeyId(null)}
+                              className="px-1 py-0.5 bg-slate-200 dark:bg-[#30363d] text-slate-600 dark:text-gray-300 rounded text-[10px]"
+                              title="取消"
+                            >
+                              否
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteKeyId(key.id)}
+                            className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-red-950/40 dark:hover:bg-red-900 text-rose-700 dark:text-red-300 rounded-lg text-xs transition border border-rose-200 dark:border-red-800/50"
+                            title="删除此密钥"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </div>
 

@@ -20,6 +20,7 @@ import {
   Key,
   Sun,
   Moon,
+  Search,
 } from 'lucide-react'
 
 export default function HostSidebar({
@@ -45,6 +46,11 @@ export default function HostSidebar({
   const [newGroupName, setNewGroupName] = useState('')
   const [editingGroupId, setEditingGroupId] = useState(null)
   const [editingGroupName, setEditingGroupName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [confirmDeleteHostId, setConfirmDeleteHostId] = useState(null)
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState(null)
+  const [creatingMoveGroupForHostId, setCreatingMoveGroupForHostId] = useState(null)
+  const [newMoveGroupName, setNewMoveGroupName] = useState('')
 
   // 移动分组菜单状态 hostId -> boolean
   const [activeMoveMenuHostId, setActiveMoveMenuHostId] = useState(null)
@@ -55,6 +61,8 @@ export default function HostSidebar({
     const handleOutsideClick = (e) => {
       if (moveMenuRef.current && !moveMenuRef.current.contains(e.target)) {
         setActiveMoveMenuHostId(null)
+        setCreatingMoveGroupForHostId(null)
+        setNewMoveGroupName('')
       }
     }
     document.addEventListener('mousedown', handleOutsideClick)
@@ -65,7 +73,7 @@ export default function HostSidebar({
     setCollapsedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }))
   }
 
-  // 整合并归类主机
+  // 整合并归类主机 (支持快速搜索实时过滤)
   const allGroupNames = Array.from(
     new Set([
       '默认分组',
@@ -74,10 +82,27 @@ export default function HostSidebar({
     ])
   )
 
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+
+  const filteredHosts = hosts.filter((h) => {
+    if (!normalizedQuery) return true
+    return (
+      (h.name && h.name.toLowerCase().includes(normalizedQuery)) ||
+      (h.ip && h.ip.toLowerCase().includes(normalizedQuery)) ||
+      (h.username && h.username.toLowerCase().includes(normalizedQuery)) ||
+      (h.group_name && h.group_name.toLowerCase().includes(normalizedQuery))
+    )
+  })
+
   const hostsByGroup = allGroupNames.reduce((acc, gName) => {
-    acc[gName] = hosts.filter((h) => (h.group_name || '默认分组') === gName)
+    acc[gName] = filteredHosts.filter((h) => (h.group_name || '默认分组') === gName)
     return acc
   }, {})
+
+  // 搜索时只展示有匹配项的分组
+  const displayedGroupNames = normalizedQuery
+    ? allGroupNames.filter((gName) => (hostsByGroup[gName] || []).length > 0)
+    : allGroupNames
 
   // 提交新建分组
   const handleCreateGroupSubmit = async (e) => {
@@ -176,12 +201,35 @@ export default function HostSidebar({
         </button>
       </div>
 
+      {/* 主机快速搜索过滤栏 */}
+      <div className="px-2 pt-2 pb-1">
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜索 VPS 名称、IP、分组..."
+            className="w-full bg-white dark:bg-[#101318] border border-slate-200 dark:border-[#30363d] rounded-lg pl-8 pr-7 py-1 text-xs text-slate-800 dark:text-gray-200 placeholder-slate-400 dark:placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition shadow-2xs"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-gray-300"
+              title="清除搜索"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* VPS 资产管理列表 */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {/* 分组操作顶部栏 */}
         <div className="flex items-center justify-between px-2 pt-1 pb-1">
           <span className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider">
-            VPS 服务器 ({hosts.length})
+            VPS 服务器 ({normalizedQuery ? `${filteredHosts.length}/${hosts.length}` : hosts.length})
           </span>
           <button
             onClick={() => {
@@ -230,13 +278,22 @@ export default function HostSidebar({
           </form>
         )}
 
+        {/* 搜索无匹配结果 */}
+        {normalizedQuery && displayedGroupNames.length === 0 && (
+          <div className="py-6 text-center text-xs text-slate-400 dark:text-gray-500">
+            未找到包含 "{searchQuery}" 的主机
+          </div>
+        )}
+
         {/* 分组列表循环 */}
-        {allGroupNames.map((gName) => {
+        {displayedGroupNames.map((gName) => {
           const groupHosts = hostsByGroup[gName] || []
-          const isCollapsed = collapsedGroups[gName]
+          // 搜索激活时强制展开，方便直接定位
+          const isCollapsed = normalizedQuery ? false : !!collapsedGroups[gName]
           const groupObj = groups.find((g) => g.name === gName)
           const isDefault = gName === '默认分组'
           const isEditing = groupObj && editingGroupId === groupObj.id
+          const isConfirmingDeleteGroup = groupObj && confirmDeleteGroupId === groupObj.id
 
           return (
             <div key={gName} className="space-y-0.5">
@@ -286,8 +343,29 @@ export default function HostSidebar({
                   </button>
                 )}
 
-                {/* 分组右侧悬浮管理按钮 */}
-                {!isEditing && (
+                {/* 分组内联删除确认或悬浮管理按钮 */}
+                {isConfirmingDeleteGroup ? (
+                  <div className="flex items-center space-x-1 animate-in fade-in" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[10px] text-rose-500 font-medium">确认删除?</span>
+                    <button
+                      onClick={() => {
+                        onDeleteGroup(groupObj.id)
+                        setConfirmDeleteGroupId(null)
+                      }}
+                      className="px-1.5 py-0.5 bg-rose-600 text-white rounded text-[10px] font-bold hover:bg-rose-500"
+                      title="确认删除该分组（组内主机自动转入默认分组）"
+                    >
+                      是
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteGroupId(null)}
+                      className="px-1 py-0.5 bg-slate-200 dark:bg-[#30363d] text-slate-600 dark:text-gray-300 rounded text-[10px]"
+                      title="取消"
+                    >
+                      否
+                    </button>
+                  </div>
+                ) : !isEditing && (
                   <div className="opacity-0 group-hover/grp:opacity-100 flex items-center space-x-1 transition shrink-0">
                     {!isDefault ? (
                       <>
@@ -305,13 +383,7 @@ export default function HostSidebar({
                         </button>
                         <button
                           onClick={() => {
-                            if (
-                              confirm(
-                                `确定删除分组「${gName}」吗？\n该分组下的所有服务器将自动移至「默认分组」。`
-                              )
-                            ) {
-                              if (groupObj) onDeleteGroup(groupObj.id)
-                            }
+                            if (groupObj) setConfirmDeleteGroupId(groupObj.id)
                           }}
                           className="p-1 text-slate-400 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 transition"
                           title="删除分组"
@@ -338,6 +410,7 @@ export default function HostSidebar({
                   ) : (
                     groupHosts.map((host) => {
                       const isMoveMenuOpen = activeMoveMenuHostId === host.id
+                      const isConfirmingDeleteHost = confirmDeleteHostId === host.id
 
                       return (
                         <div
@@ -358,53 +431,79 @@ export default function HostSidebar({
                             </div>
                           </div>
 
-                          {/* 主机操作按钮组 */}
-                          <div className="opacity-0 group-hover/host:opacity-100 flex items-center space-x-0.5 transition shrink-0 ml-1">
-                            {/* 移动分组按钮 */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setActiveMoveMenuHostId(isMoveMenuOpen ? null : host.id)
-                              }}
-                              className="p-1 text-slate-500 hover:text-cyan-600 dark:text-gray-400 dark:hover:text-cyan-400 hover:bg-slate-200 dark:hover:bg-[#30363d] rounded transition"
-                              title="移动到其它分组"
+                          {/* 主机内联确认删除或操作按钮组 */}
+                          {isConfirmingDeleteHost ? (
+                            <div
+                              className="flex items-center space-x-1 animate-in fade-in shrink-0 ml-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <MoveRight size={13} />
-                            </button>
-
-                            {/* 编辑主机信息按钮 */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onEditHost(host)
-                              }}
-                              className="p-1 text-slate-500 hover:text-amber-600 dark:text-gray-400 dark:hover:text-yellow-400 hover:bg-slate-200 dark:hover:bg-[#30363d] rounded transition"
-                              title="编辑主机配置"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-
-                            {/* 删除主机按钮 */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (confirm(`确定删除 VPS 主机「${host.name}」吗？`)) {
+                              <span className="text-[10px] text-rose-500 font-medium">删除?</span>
+                              <button
+                                onClick={() => {
                                   onDeleteHost(host.id)
-                                }
-                              }}
-                              className="p-1 text-slate-500 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#30363d] rounded transition"
-                              title="删除主机"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
+                                  setConfirmDeleteHostId(null)
+                                }}
+                                className="px-1.5 py-0.5 bg-rose-600 text-white rounded text-[10px] font-bold hover:bg-rose-500"
+                                title="确认删除主机"
+                              >
+                                是
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteHostId(null)}
+                                className="px-1 py-0.5 bg-slate-200 dark:bg-[#30363d] text-slate-600 dark:text-gray-300 rounded text-[10px]"
+                                title="取消"
+                              >
+                                否
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="opacity-0 group-hover/host:opacity-100 flex items-center space-x-0.5 transition shrink-0 ml-1">
+                              {/* 移动分组按钮 */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setActiveMoveMenuHostId(isMoveMenuOpen ? null : host.id)
+                                  setCreatingMoveGroupForHostId(null)
+                                  setNewMoveGroupName('')
+                                }}
+                                className="p-1 text-slate-500 hover:text-cyan-600 dark:text-gray-400 dark:hover:text-cyan-400 hover:bg-slate-200 dark:hover:bg-[#30363d] rounded transition"
+                                title="移动到其它分组"
+                              >
+                                <MoveRight size={13} />
+                              </button>
+
+                              {/* 编辑主机信息按钮 */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onEditHost(host)
+                                }}
+                                className="p-1 text-slate-500 hover:text-amber-600 dark:text-gray-400 dark:hover:text-yellow-400 hover:bg-slate-200 dark:hover:bg-[#30363d] rounded transition"
+                                title="编辑主机配置"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+
+                              {/* 删除主机按钮 */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setConfirmDeleteHostId(host.id)
+                                }}
+                                className="p-1 text-slate-500 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 hover:bg-slate-200 dark:hover:bg-[#30363d] rounded transition"
+                                title="删除主机"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          )}
 
                           {/* 移动分组弹出菜单 */}
                           {isMoveMenuOpen && (
                             <div
                               ref={moveMenuRef}
                               onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 top-8 z-50 w-44 bg-white dark:bg-[#1f242c] border border-slate-200 dark:border-[#30363d] rounded-xl shadow-2xl p-1.5 space-y-1 text-xs animate-in fade-in zoom-in-95 text-slate-700 dark:text-gray-300"
+                              className="absolute right-0 top-8 z-50 w-48 bg-white dark:bg-[#1f242c] border border-slate-200 dark:border-[#30363d] rounded-xl shadow-2xl p-1.5 space-y-1 text-xs animate-in fade-in zoom-in-95 text-slate-700 dark:text-gray-300"
                             >
                               <div className="px-2 py-1 text-[10px] font-bold text-slate-500 dark:text-gray-400 border-b border-slate-200 dark:border-[#30363d] uppercase tracking-wider flex items-center justify-between">
                                 <span>移动至分组</span>
@@ -435,18 +534,68 @@ export default function HostSidebar({
                                   )
                                 })}
                               </div>
-                              <button
-                                onClick={() => {
-                                  const customName = prompt('输入新分组名称并移动该主机：')
-                                  if (customName && customName.trim()) {
-                                    onMoveHost(host.id, customName.trim())
-                                    setActiveMoveMenuHostId(null)
-                                  }
-                                }}
-                                className="w-full text-left px-2 py-1 text-[11px] text-cyan-600 dark:text-cyan-400 hover:bg-slate-100 dark:hover:bg-[#262c36] rounded font-medium border-t border-slate-200 dark:border-[#30363d] mt-1"
-                              >
-                                + 移入新建分组...
-                              </button>
+
+                              {/* 内联新建分组并移入，告别原生 prompt */}
+                              {creatingMoveGroupForHostId === host.id ? (
+                                <div className="p-1 pt-1.5 border-t border-slate-200 dark:border-[#30363d] mt-1 space-y-1.5">
+                                  <input
+                                    type="text"
+                                    value={newMoveGroupName}
+                                    onChange={(e) => setNewMoveGroupName(e.target.value)}
+                                    placeholder="输入新分组名称..."
+                                    className="w-full bg-slate-50 dark:bg-[#101318] border border-cyan-500 rounded px-2 py-1 text-xs text-slate-800 dark:text-white focus:outline-none"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        const trimmed = newMoveGroupName.trim()
+                                        if (trimmed) {
+                                          onMoveHost(host.id, trimmed)
+                                          setActiveMoveMenuHostId(null)
+                                          setCreatingMoveGroupForHostId(null)
+                                          setNewMoveGroupName('')
+                                        }
+                                      } else if (e.key === 'Escape') {
+                                        setCreatingMoveGroupForHostId(null)
+                                      }
+                                    }}
+                                  />
+                                  <div className="flex items-center justify-end space-x-1">
+                                    <button
+                                      onClick={() => {
+                                        const trimmed = newMoveGroupName.trim()
+                                        if (trimmed) {
+                                          onMoveHost(host.id, trimmed)
+                                          setActiveMoveMenuHostId(null)
+                                          setCreatingMoveGroupForHostId(null)
+                                          setNewMoveGroupName('')
+                                        }
+                                      }}
+                                      className="px-2 py-0.5 bg-cyan-600 text-white rounded text-[10px] font-medium hover:bg-cyan-500"
+                                    >
+                                      确定
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setCreatingMoveGroupForHostId(null)
+                                        setNewMoveGroupName('')
+                                      }}
+                                      className="px-1.5 py-0.5 bg-slate-200 dark:bg-[#30363d] text-slate-600 dark:text-gray-300 rounded text-[10px]"
+                                    >
+                                      取消
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setCreatingMoveGroupForHostId(host.id)
+                                    setNewMoveGroupName('')
+                                  }}
+                                  className="w-full text-left px-2 py-1 text-[11px] text-cyan-600 dark:text-cyan-400 hover:bg-slate-100 dark:hover:bg-[#262c36] rounded font-medium border-t border-slate-200 dark:border-[#30363d] mt-1"
+                                >
+                                  + 移入新建分组...
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -466,7 +615,7 @@ export default function HostSidebar({
           <ShieldCheck size={14} className="text-emerald-500 dark:text-emerald-400" />
           <span>三级安全审计已开启</span>
         </div>
-        <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono">v1.0.7</span>
+        <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono font-medium">v1.0.8</span>
       </div>
     </aside>
   )

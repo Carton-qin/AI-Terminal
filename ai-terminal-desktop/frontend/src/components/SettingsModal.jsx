@@ -37,6 +37,7 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [confirmDeleteProfile, setConfirmDeleteProfile] = useState(false)
 
   // 加载已保存档案与当前活跃配置
   const fetchProfilesAndConfig = async () => {
@@ -156,12 +157,9 @@ export default function SettingsModal({ isOpen, onClose }) {
   // 删除当前选中的预设
   const handleDeleteProfile = async () => {
     if (!selectedProfileId) return
-    const cur = profiles.find((p) => p.id === selectedProfileId)
-    if (!cur) return
-    if (confirm(`确定删除预设档案 "${cur.name}" 吗？`)) {
-      await fetch(`http://127.0.0.1:8765/api/ai/profiles/${selectedProfileId}`, { method: 'DELETE' })
-      await fetchProfilesAndConfig()
-    }
+    setConfirmDeleteProfile(false)
+    await fetch(`http://127.0.0.1:8765/api/ai/profiles/${selectedProfileId}`, { method: 'DELETE' })
+    await fetchProfilesAndConfig()
   }
 
   // 保存当前配置并立即生效
@@ -241,14 +239,36 @@ export default function SettingsModal({ isOpen, onClose }) {
                   <span>另存为新配置</span>
                 </button>
                 {selectedProfileId && (
-                  <button
-                    type="button"
-                    onClick={handleDeleteProfile}
-                    className="p-1 text-slate-400 hover:text-rose-600 dark:text-gray-500 dark:hover:text-red-400 transition"
-                    title="删除当前选中的预设"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  confirmDeleteProfile ? (
+                    <div className="flex items-center space-x-1 animate-in fade-in">
+                      <span className="text-[10px] text-rose-500 font-medium">确认删除?</span>
+                      <button
+                        type="button"
+                        onClick={handleDeleteProfile}
+                        className="px-1.5 py-0.5 bg-rose-600 text-white rounded text-[10px] font-bold hover:bg-rose-500"
+                        title="确认删除该预设"
+                      >
+                        是
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteProfile(false)}
+                        className="px-1 py-0.5 bg-slate-200 dark:bg-[#30363d] text-slate-600 dark:text-gray-300 rounded text-[10px]"
+                        title="取消"
+                      >
+                        否
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteProfile(true)}
+                      className="p-1 text-slate-400 hover:text-rose-600 dark:text-gray-500 dark:hover:text-red-400 transition"
+                      title="删除当前选中的预设"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )
                 )}
               </div>
             </div>

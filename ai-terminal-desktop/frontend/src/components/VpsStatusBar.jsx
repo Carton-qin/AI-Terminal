@@ -15,11 +15,11 @@ import {
   X,
 } from 'lucide-react'
 
-// 颜色工具函数：根据百分比返回主题色
+// 颜色工具函数：根据百分比返回主题色（兼顾浅色模式与深色模式的高清晰对比度）
 const getPercentColor = (percent) => {
-  if (percent >= 85) return 'text-red-400 bg-red-500'
-  if (percent >= 60) return 'text-amber-400 bg-amber-500'
-  return 'text-emerald-400 bg-emerald-500'
+  if (percent >= 85) return 'text-rose-600 dark:text-red-400 bg-rose-500 dark:bg-red-500'
+  if (percent >= 60) return 'text-amber-600 dark:text-amber-400 bg-amber-500 dark:bg-amber-500'
+  return 'text-emerald-600 dark:text-emerald-400 bg-emerald-500 dark:bg-emerald-500'
 }
 
 export default function VpsStatusBar({ activeTab, visible = true, onClose }) {

@@ -33,6 +33,7 @@ export default function DockerModal({
   const [logsLoading, setLogsLoading] = useState(false)
   const [logTail, setLogTail] = useState(100)
   const [copiedLog, setCopiedLog] = useState(false)
+  const [confirmRemoveTarget, setConfirmRemoveTarget] = useState(null) // { id, name }
 
   const sessionId = activeTab?.sessionId
 
@@ -71,7 +72,15 @@ export default function DockerModal({
   }, [isOpen, sessionId])
 
   // 执行容器动作 (start, stop, restart, remove)
-  const handleContainerAction = async (containerId, action, containerName = '') => {
+  const handleContainerAction = (containerId, action, containerName = '') => {
+    if (action === 'remove') {
+      setConfirmRemoveTarget({ id: containerId, name: containerName })
+      return
+    }
+    doContainerAction(containerId, action)
+  }
+
+  const doContainerAction = async (containerId, action) => {
     const actionNames = {
       start: '启动',
       stop: '停止',
@@ -79,11 +88,6 @@ export default function DockerModal({
       remove: '删除',
     }
     const label = actionNames[action] || action
-    if (action === 'remove') {
-      if (!confirm(`确定要彻底删除容器 "${containerName || containerId}" 吗？此操作不可逆！`)) {
-        return
-      }
-    }
     try {
       setLoading(true)
       const res = await fetch('http://127.0.0.1:8765/api/docker/action', {
@@ -101,7 +105,7 @@ export default function DockerModal({
       }
       await fetchContainers()
     } catch (err) {
-      alert(`操作失败: ${err.message}`)
+      setErrorMsg(`操作失败: ${err.message}`)
     } finally {
       setLoading(false)
     }
@@ -487,6 +491,48 @@ export default function DockerModal({
             关闭
           </button>
         </div>
+
+        {/* 内联彻底删除容器确认弹窗 (告别原生 confirm) */}
+        {confirmRemoveTarget && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-2xs p-4 animate-in fade-in">
+            <div className="w-full max-w-md bg-white dark:bg-[#1c2128] border border-slate-300 dark:border-[#30363d] rounded-xl shadow-2xl p-5 text-slate-800 dark:text-gray-100 space-y-4">
+              <div className="flex items-start space-x-3">
+                <div className="p-2 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">
+                    确认彻底删除 Docker 容器？
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
+                    即将彻底销毁容器: <span className="font-mono font-bold text-rose-600 dark:text-rose-400">{confirmRemoveTarget.name || confirmRemoveTarget.id}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-gray-400 mt-1">
+                    此操作不可逆。若该容器未挂载持久化卷，容器内所有未保存数据将被永久清除。
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-[#30363d]">
+                <button
+                  onClick={() => setConfirmRemoveTarget(null)}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] dark:hover:bg-[#30363d] text-slate-700 dark:text-gray-300 transition"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    const targetId = confirmRemoveTarget.id
+                    setConfirmRemoveTarget(null)
+                    doContainerAction(targetId, 'remove')
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold transition"
+                >
+                  确认删除
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

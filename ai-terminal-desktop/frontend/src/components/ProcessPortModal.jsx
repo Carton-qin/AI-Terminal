@@ -10,6 +10,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Zap,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 
 export default function ProcessPortModal({
@@ -26,8 +29,33 @@ export default function ProcessPortModal({
   const [filterText, setFilterText] = useState('')
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [actionNotice, setActionNotice] = useState(null) // { type: 'success' | 'error', text: '' }
+  const [killConfirmTarget, setKillConfirmTarget] = useState(null) // { pid, signal, name }
+
+  // 排序状态
+  const [portSort, setPortSort] = useState({ field: 'port', asc: true })
+  const [procSort, setProcSort] = useState({ field: 'cpu', asc: false })
 
   const sessionId = activeTab?.sessionId
+
+  const showNotice = (type, text) => {
+    setActionNotice({ type, text })
+    setTimeout(() => setActionNotice(null), 3500)
+  }
+
+  const handleSortPort = (field) => {
+    setPortSort((prev) => ({
+      field,
+      asc: prev.field === field ? !prev.asc : true,
+    }))
+  }
+
+  const handleSortProc = (field) => {
+    setProcSort((prev) => ({
+      field,
+      asc: prev.field === field ? !prev.asc : (field === 'cpu' || field === 'mem' ? false : true),
+    }))
+  }
 
   const fetchPorts = async () => {
     if (!sessionId) {
@@ -96,11 +124,14 @@ export default function ProcessPortModal({
     return () => clearInterval(timer)
   }, [isOpen, autoRefresh, activeSubTab, sessionId])
 
-  // 杀死进程
-  const handleKillProcess = async (pid, signal = 'TERM', name = '') => {
-    if (!confirm(`确定要向进程 PID: ${pid} (${name || '未知'}) 发送 SIG${signal} 信号吗？`)) {
-      return
-    }
+  // 打开内联杀死进程确认
+  const promptKillProcess = (pid, signal = 'TERM', name = '') => {
+    setKillConfirmTarget({ pid, signal, name })
+  }
+
+  // 执行杀死进程
+  const executeKill = async (pid, signal = 'TERM') => {
+    setKillConfirmTarget(null)
     try {
       const res = await fetch('http://127.0.0.1:8765/api/system/kill', {
         method: 'POST',
@@ -115,9 +146,10 @@ export default function ProcessPortModal({
         const err = await res.json()
         throw new Error(err.detail || '终止进程失败')
       }
+      showNotice('success', `已成功向 PID: ${pid} 发送 SIG${signal} 信号`)
       handleRefresh()
     } catch (err) {
-      alert(`操作失败: ${err.message}`)
+      showNotice('error', `终止进程失败: ${err.message}`)
     }
   }
 
@@ -148,6 +180,20 @@ export default function ProcessPortModal({
     )
   })
 
+  const sortedPorts = [...filteredPorts].sort((a, b) => {
+    const { field, asc } = portSort
+    let valA = a[field]
+    let valB = b[field]
+    if (field === 'port' || field === 'pid') {
+      valA = Number(valA) || 0
+      valB = Number(valB) || 0
+      return asc ? valA - valB : valB - valA
+    }
+    valA = (valA || '').toString().toLowerCase()
+    valB = (valB || '').toString().toLowerCase()
+    return asc ? valA.localeCompare(valB) : valB.localeCompare(valA)
+  })
+
   const filteredProcesses = processes.filter((p) => {
     const q = filterText.toLowerCase()
     return (
@@ -155,6 +201,25 @@ export default function ProcessPortModal({
       (p.user && p.user.toLowerCase().includes(q)) ||
       (p.command && p.command.toLowerCase().includes(q))
     )
+  })
+
+  const sortedProcesses = [...filteredProcesses].sort((a, b) => {
+    const { field, asc } = procSort
+    let valA = a[field]
+    let valB = b[field]
+    if (field === 'cpu' || field === 'mem') {
+      valA = parseFloat(valA) || 0
+      valB = parseFloat(valB) || 0
+      return asc ? valA - valB : valB - valA
+    }
+    if (field === 'pid') {
+      valA = parseInt(valA, 10) || 0
+      valB = parseInt(valB, 10) || 0
+      return asc ? valA - valB : valB - valA
+    }
+    valA = (valA || '').toString().toLowerCase()
+    valB = (valB || '').toString().toLowerCase()
+    return asc ? valA.localeCompare(valB) : valB.localeCompare(valA)
   })
 
   return (
@@ -260,6 +325,23 @@ export default function ProcessPortModal({
 
         {/* 内容展示区 */}
         <div className="flex-1 overflow-auto p-4 bg-slate-100/60 dark:bg-[#0d1117]">
+          {actionNotice && (
+            <div
+              className={`mb-3 p-3 rounded-lg border text-xs flex items-center space-x-2 animate-in fade-in ${
+                actionNotice.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                  : 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+              }`}
+            >
+              {actionNotice.type === 'success' ? (
+                <CheckCircle2 size={15} className="shrink-0 text-emerald-500" />
+              ) : (
+                <AlertTriangle size={15} className="shrink-0 text-rose-500" />
+              )}
+              <span>{actionNotice.text}</span>
+            </div>
+          )}
+
           {errorMsg && (
             <div className="mb-3 p-3 rounded-lg bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-800 dark:text-red-300 text-xs flex items-center space-x-2">
               <AlertTriangle size={15} className="shrink-0 text-red-500" />
@@ -268,28 +350,88 @@ export default function ProcessPortModal({
           )}
 
           {activeSubTab === 'ports' ? (
-            /* 端口列表表格 */
+            /* 端口列表表格 (支持字段点击排序) */
             <div className="border border-slate-200 dark:border-[#30363d] rounded-lg overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
               <table className="w-full text-left text-xs text-slate-700 dark:text-gray-300">
-                <thead className="bg-slate-100 dark:bg-[#21262d] text-slate-600 dark:text-gray-400 uppercase text-[11px] font-semibold border-b border-slate-200 dark:border-[#30363d]">
+                <thead className="bg-slate-100 dark:bg-[#21262d] text-slate-600 dark:text-gray-400 uppercase text-[11px] font-semibold border-b border-slate-200 dark:border-[#30363d] select-none">
                   <tr>
-                    <th className="py-2.5 px-3">协议</th>
-                    <th className="py-2.5 px-3">端口</th>
-                    <th className="py-2.5 px-3">绑定地址</th>
-                    <th className="py-2.5 px-3">状态</th>
-                    <th className="py-2.5 px-3">对应程序 / PID</th>
+                    <th
+                      onClick={() => handleSortPort('proto')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>协议</span>
+                        {portSort.field === 'proto' ? (
+                          portSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortPort('port')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>端口</span>
+                        {portSort.field === 'port' ? (
+                          portSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortPort('local_address')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>绑定地址</span>
+                        {portSort.field === 'local_address' ? (
+                          portSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortPort('state')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>状态</span>
+                        {portSort.field === 'state' ? (
+                          portSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortPort('program')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>对应程序 / PID</span>
+                        {portSort.field === 'program' ? (
+                          portSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
                     <th className="py-2.5 px-3 text-right">管理操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-[#30363d]/60 font-mono">
-                  {filteredPorts.length === 0 ? (
+                  {sortedPorts.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-gray-500 font-sans">
                         {loading ? '正在扫描系统端口...' : '未检索到匹配的监听端口'}
                       </td>
                     </tr>
                   ) : (
-                    filteredPorts.map((item, idx) => (
+                    sortedPorts.map((item, idx) => (
                       <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-[#21262d]/50 transition">
                         <td className="py-2 px-3">
                           <span
@@ -337,9 +479,9 @@ export default function ProcessPortModal({
                           </button>
                           {item.pid && (
                             <button
-                              onClick={() => handleKillProcess(item.pid, 'TERM', item.program)}
+                              onClick={() => promptKillProcess(item.pid, 'TERM', item.program)}
                               className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-red-950/60 dark:hover:bg-red-900 dark:text-red-300 dark:border-red-800 rounded-lg text-[11px] inline-flex items-center space-x-1 transition shadow-2xs"
-                              title="向进程发送 SIGTERM 优雅退出信号"
+                              title="终止该进程"
                             >
                               <Trash2 size={11} />
                               <span>终止</span>
@@ -353,28 +495,88 @@ export default function ProcessPortModal({
               </table>
             </div>
           ) : (
-            /* 系统进程列表表格 */
+            /* 系统进程列表表格 (支持字段点击排序) */
             <div className="border border-slate-200 dark:border-[#30363d] rounded-lg overflow-hidden bg-white dark:bg-[#161b22] shadow-xs">
               <table className="w-full text-left text-xs text-slate-700 dark:text-gray-300">
-                <thead className="bg-slate-100 dark:bg-[#21262d] text-slate-600 dark:text-gray-400 uppercase text-[11px] font-semibold border-b border-slate-200 dark:border-[#30363d]">
+                <thead className="bg-slate-100 dark:bg-[#21262d] text-slate-600 dark:text-gray-400 uppercase text-[11px] font-semibold border-b border-slate-200 dark:border-[#30363d] select-none">
                   <tr>
-                    <th className="py-2.5 px-3">PID</th>
-                    <th className="py-2.5 px-3">运行用户</th>
-                    <th className="py-2.5 px-3">% CPU</th>
-                    <th className="py-2.5 px-3">% 内存</th>
-                    <th className="py-2.5 px-3">命令行 (Command)</th>
+                    <th
+                      onClick={() => handleSortProc('pid')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>PID</span>
+                        {procSort.field === 'pid' ? (
+                          procSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortProc('user')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>运行用户</span>
+                        {procSort.field === 'user' ? (
+                          procSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortProc('cpu')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>% CPU</span>
+                        {procSort.field === 'cpu' ? (
+                          procSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortProc('mem')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>% 内存</span>
+                        {procSort.field === 'mem' ? (
+                          procSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSortProc('command')}
+                      className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-[#30363d] transition group"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>命令行 (Command)</span>
+                        {procSort.field === 'command' ? (
+                          procSort.asc ? <ArrowUp size={11} className="text-cyan-500" /> : <ArrowDown size={11} className="text-cyan-500" />
+                        ) : (
+                          <ArrowUpDown size={11} className="opacity-40 group-hover:opacity-100" />
+                        )}
+                      </div>
+                    </th>
                     <th className="py-2.5 px-3 text-right">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#30363d]/60 font-mono">
-                  {filteredProcesses.length === 0 ? (
+                  {sortedProcesses.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-gray-500 font-sans">
                         {loading ? '正在获取进程列表...' : '未找到符合条件的进程'}
                       </td>
                     </tr>
                   ) : (
-                    filteredProcesses.map((proc, idx) => {
+                    sortedProcesses.map((proc, idx) => {
                       const cpuVal = parseFloat(proc.cpu) || 0
                       const memVal = parseFloat(proc.mem) || 0
                       return (
@@ -420,14 +622,14 @@ export default function ProcessPortModal({
                               <span>问 AI</span>
                             </button>
                             <button
-                              onClick={() => handleKillProcess(proc.pid, 'TERM', proc.command)}
+                              onClick={() => promptKillProcess(proc.pid, 'TERM', proc.command)}
                               className="px-2 py-1 bg-slate-100 hover:bg-rose-100 hover:text-rose-700 dark:bg-[#21262d] dark:hover:bg-red-950/60 dark:hover:text-red-300 text-slate-600 dark:text-gray-400 border border-slate-200 dark:border-transparent rounded text-[11px] transition"
                               title="SIGTERM 优雅终止"
                             >
                               终止
                             </button>
                             <button
-                              onClick={() => handleKillProcess(proc.pid, 'KILL', proc.command)}
+                              onClick={() => promptKillProcess(proc.pid, 'KILL', proc.command)}
                               className="px-2 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-red-950/70 dark:hover:bg-red-900 text-rose-700 dark:text-red-300 border border-rose-200 dark:border-red-800 rounded text-[11px] inline-flex items-center space-x-1 transition font-bold"
                               title="SIGKILL 强制杀死"
                             >
@@ -449,7 +651,7 @@ export default function ProcessPortModal({
         <div className="h-10 border-t border-slate-200 dark:border-[#30363d] px-5 bg-slate-50 dark:bg-[#0f1319] flex items-center justify-between text-xs text-slate-500 dark:text-gray-400 shrink-0">
           <div className="flex items-center space-x-2">
             <span className="text-slate-400 dark:text-gray-500">提示：</span>
-            <span>终止服务进程可能导致相关网站或守护进程中断，请谨慎操作。可先点击「问 AI」核实安全性。</span>
+            <span>支持点击表头字段快速排序。终止系统进程可能中断相关服务，请谨慎操作。</span>
           </div>
           <button
             onClick={onClose}
@@ -458,6 +660,46 @@ export default function ProcessPortModal({
             关闭
           </button>
         </div>
+
+        {/* 内联杀死进程确认弹窗 (告别原生 confirm) */}
+        {killConfirmTarget && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-2xs p-4 animate-in fade-in">
+            <div className="w-full max-w-md bg-white dark:bg-[#1c2128] border border-slate-300 dark:border-[#30363d] rounded-xl shadow-2xl p-5 text-slate-800 dark:text-gray-100 space-y-4">
+              <div className="flex items-start space-x-3">
+                <div className="p-2 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold">
+                    确认发送 SIG{killConfirmTarget.signal} 终止进程？
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">
+                    即将向目标进程 PID: <span className="font-mono font-bold text-rose-600 dark:text-rose-400">{killConfirmTarget.pid}</span> 发送信号。
+                  </p>
+                  {killConfirmTarget.name && (
+                    <div className="mt-2 p-2 bg-slate-100 dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded text-[11px] font-mono text-slate-700 dark:text-gray-300 break-all max-h-24 overflow-y-auto">
+                      {killConfirmTarget.name}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-[#30363d]">
+                <button
+                  onClick={() => setKillConfirmTarget(null)}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-slate-100 hover:bg-slate-200 dark:bg-[#21262d] dark:hover:bg-[#30363d] text-slate-700 dark:text-gray-300 transition"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => executeKill(killConfirmTarget.pid, killConfirmTarget.signal)}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold transition"
+                >
+                  确认终止 (SIG{killConfirmTarget.signal})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

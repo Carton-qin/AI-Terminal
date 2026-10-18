@@ -82,9 +82,79 @@ export default function App() {
   useEffect(() => {
     fetchHosts()
     fetchGroups()
-    // 首次自动打开一个本地 macOS 终端会话
+    // 首次自动打开一个本地终端会话
     openLocalTab()
   }, [])
+
+  // 全局键盘快捷键响应 (Cmd/Ctrl+T, Cmd/Ctrl+W, Esc, Cmd/Ctrl+1..9)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // 1. ESC 键：一键关闭所有浮层弹窗 / 抽屉
+      if (e.key === 'Escape') {
+        if (isHostModalOpen) {
+          setIsHostModalOpen(false)
+          setEditingHost(null)
+          return
+        }
+        if (isSnippetOpen) {
+          setIsSnippetOpen(false)
+          return
+        }
+        if (isSettingsOpen) {
+          setIsSettingsOpen(false)
+          return
+        }
+        if (isKeyManagerOpen) {
+          setIsKeyManagerOpen(false)
+          return
+        }
+      }
+
+      // 2. Cmd/Ctrl + T：新建本地终端 Tab
+      if ((e.metaKey || e.ctrlKey) && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault()
+        openLocalTab()
+        return
+      }
+
+      // 3. Cmd/Ctrl + W：关闭当前激活 Tab
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'w' || e.key === 'W')) {
+        if (isHostModalOpen || isSnippetOpen || isSettingsOpen || isKeyManagerOpen) {
+          e.preventDefault()
+          setIsHostModalOpen(false)
+          setIsSnippetOpen(false)
+          setIsSettingsOpen(false)
+          setIsKeyManagerOpen(false)
+          return
+        }
+        if (activeTabId) {
+          e.preventDefault()
+          handleCloseTab(activeTabId)
+          return
+        }
+      }
+
+      // 4. Cmd/Ctrl + 1..9：快速切换到指定序号的 Tab
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+        const targetIdx = parseInt(e.key, 10) - 1
+        if (tabs[targetIdx]) {
+          e.preventDefault()
+          setActiveTabId(tabs[targetIdx].id)
+          return
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [
+    isHostModalOpen,
+    isSnippetOpen,
+    isSettingsOpen,
+    isKeyManagerOpen,
+    activeTabId,
+    tabs,
+  ])
 
   // 打开本地终端 Tab
   const openLocalTab = async () => {
@@ -195,6 +265,13 @@ export default function App() {
       delete next[tabId]
       return next
     })
+  }
+
+  // 重命名指定 Tab
+  const handleRenameTab = (tabId, newTitle) => {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === tabId ? { ...t, title: newTitle } : t))
+    )
   }
 
   // 创建新分组
@@ -402,6 +479,7 @@ export default function App() {
           activeTabId={activeTabId}
           onSelectTab={setActiveTabId}
           onCloseTab={handleCloseTab}
+          onRenameTab={handleRenameTab}
           onNewLocalTab={openLocalTab}
           onRegisterInjectHandler={(fn) => (injectHandlerRef.current = fn)}
           onRegisterBufferReader={(fn) => (bufferReaderRef.current = fn)}

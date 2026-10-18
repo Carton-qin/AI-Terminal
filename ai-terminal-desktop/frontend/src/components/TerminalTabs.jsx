@@ -293,6 +293,7 @@ export default function TerminalTabs({
   activeTabId,
   onSelectTab,
   onCloseTab,
+  onRenameTab,
   onNewLocalTab,
   onRegisterInjectHandler,
   onRegisterBufferReader,
@@ -305,6 +306,15 @@ export default function TerminalTabs({
 }) {
   const terminalRefs = useRef({})
   const containerRefs = useRef({})
+
+  const [editingTabId, setEditingTabId] = useState(null)
+  const [editingTabTitle, setEditingTabTitle] = useState('')
+  const [splitNotice, setSplitNotice] = useState(null)
+
+  const showSplitNotice = (msg) => {
+    setSplitNotice(msg)
+    setTimeout(() => setSplitNotice(null), 3500)
+  }
 
   // 用户持久化终端外观设置
   const [currentTheme, setCurrentTheme] = useState(() => {
@@ -936,12 +946,21 @@ export default function TerminalTabs({
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId
             const isSplitActive = splitMode !== 'none' && tab.id === splitTabId
+            const isEditingThisTab = editingTabId === tab.id
 
             return (
               <div
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id)}
-                className={`group flex items-center space-x-2 px-3 py-1.5 text-xs rounded-lg cursor-pointer transition-all max-w-[200px] border whitespace-nowrap shrink-0 select-none ${
+                onMouseDown={(e) => {
+                  // 鼠标中键 (滚轮点击) 快捷关闭 Tab
+                  if (e.button === 1) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onCloseTab(tab.id)
+                  }
+                }}
+                className={`group flex items-center space-x-2 px-3 py-1.5 text-xs rounded-lg cursor-pointer transition-all max-w-[220px] border whitespace-nowrap shrink-0 select-none ${
                   isActive
                     ? 'bg-white dark:bg-[#1a1b26] text-slate-900 dark:text-white border-slate-300 dark:border-cyan-500/80 font-medium shadow-xs'
                     : isSplitActive
@@ -954,14 +973,53 @@ export default function TerminalTabs({
                 ) : (
                   <TerminalIcon size={13} className="text-cyan-500 dark:text-cyan-400 shrink-0" />
                 )}
-                <span className="truncate">{tab.title}</span>
+
+                {isEditingThisTab ? (
+                  <input
+                    type="text"
+                    value={editingTabTitle}
+                    onChange={(e) => setEditingTabTitle(e.target.value)}
+                    onBlur={() => {
+                      if (editingTabTitle.trim() && onRenameTab) {
+                        onRenameTab(tab.id, editingTabTitle.trim())
+                      }
+                      setEditingTabId(null)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (editingTabTitle.trim() && onRenameTab) {
+                          onRenameTab(tab.id, editingTabTitle.trim())
+                        }
+                        setEditingTabId(null)
+                      } else if (e.key === 'Escape') {
+                        setEditingTabId(null)
+                      }
+                    }}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-transparent border-b border-cyan-500 text-xs text-slate-900 dark:text-white outline-none px-0.5 py-0 w-24"
+                  />
+                ) : (
+                  <span
+                    className="truncate"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation()
+                      setEditingTabId(tab.id)
+                      setEditingTabTitle(tab.title)
+                    }}
+                    title="双击自定义标签名称，或鼠标滚轮中键直接关闭"
+                  >
+                    {tab.title}
+                  </span>
+                )}
+
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
                     onCloseTab(tab.id)
                   }}
                   className="opacity-60 group-hover:opacity-100 hover:text-rose-500 hover:bg-black/5 dark:hover:bg-white/10 p-0.5 rounded transition shrink-0"
-                  title="关闭标签页"
+                  title="关闭标签页 (支持鼠标中键点击)"
                 >
                   <X size={12} />
                 </button>
@@ -1006,6 +1064,12 @@ export default function TerminalTabs({
         className="flex-1 flex flex-col relative overflow-hidden transition-colors duration-200"
         style={{ backgroundColor: activeTheme.background }}
       >
+        {splitNotice && (
+          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-amber-500 text-white rounded-xl shadow-xl text-xs font-medium flex items-center space-x-2 animate-in fade-in zoom-in-95 pointer-events-none">
+            <span>⚠️ {splitNotice}</span>
+          </div>
+        )}
+
         {tabs.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-gray-500">
             <TerminalIcon size={48} className="mb-3 opacity-20 text-cyan-500" />
@@ -1102,7 +1166,7 @@ export default function TerminalTabs({
                   <button
                     onClick={() => {
                       if (tabs.length < 2) {
-                        alert('分屏需要至少打开 2 个终端 Tab。请先连接其他 VPS 或点击 + 新建本地终端。')
+                        showSplitNotice('分屏需要至少打开 2 个终端 Tab。请先连接其他 VPS 或点击 + 新建本地终端。')
                         return
                       }
                       setSplitMode('vertical')
@@ -1125,7 +1189,7 @@ export default function TerminalTabs({
                   <button
                     onClick={() => {
                       if (tabs.length < 2) {
-                        alert('分屏需要至少打开 2 个终端 Tab。请先连接其他 VPS 或点击 + 新建本地终端。')
+                        showSplitNotice('分屏需要至少打开 2 个终端 Tab。请先连接其他 VPS 或点击 + 新建本地终端。')
                         return
                       }
                       setSplitMode('horizontal')

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useMemo } from 'react'
 import {
   Folder,
   FolderPlus,
@@ -28,6 +28,8 @@ import {
   Lock,
   Terminal as TerminalIcon,
   Flame,
+  ChevronRight,
+  Bookmark,
 } from 'lucide-react'
 
 // 判断是否为压缩包
@@ -84,8 +86,36 @@ export default function SftpFileManager({
   const [parentPath, setParentPath] = useState('/')
   const [pathInput, setPathInput] = useState('.')
   const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [errorMsg, setErrorMsg] = useState(null)
+  // 路径面包屑与直接输入模式切换
+  const [isEditingPath, setIsEditingPath] = useState(false)
+  const [showBookmarks, setShowBookmarks] = useState(false)
+
+  // 常用 Linux 运维快捷书签
+  const COMMON_BOOKMARKS = [
+    { name: '用户主目录 (~)', path: '~' },
+    { name: '系统根目录 (/)', path: '/' },
+    { name: 'root 用户家目录 (/root)', path: '/root' },
+    { name: '系统核心配置 (/etc)', path: '/etc' },
+    { name: '系统与服务日志 (/var/log)', path: '/var/log' },
+    { name: 'Web网站主目录 (/var/www)', path: '/var/www' },
+    { name: '应用程序目录 (/opt)', path: '/opt' },
+    { name: '临时文件目录 (/tmp)', path: '/tmp' },
+  ]
+
+  // 面包屑路径分段解析
+  const pathBreadcrumbs = useMemo(() => {
+    if (!currentPath || currentPath === '.') return [{ label: '.', path: '.' }]
+    if (currentPath === '~') return [{ label: '~', path: '~' }]
+
+    const parts = currentPath.split('/').filter(Boolean)
+    const result = [{ label: '/', path: '/' }]
+    let accumulated = ''
+    parts.forEach((part) => {
+      accumulated += '/' + part
+      result.push({ label: part, path: accumulated })
+    })
+    return result
+  }, [currentPath])
 
   // 搜索与大文件扫描模式: 'local' (本地过滤) | 'recursive' (递归检索) | 'big_files' (大文件)
   const [searchMode, setSearchMode] = useState('local')
@@ -594,16 +624,92 @@ export default function SftpFileManager({
           </button>
         </div>
 
-        {/* 中间：路径地址栏 */}
-        <form onSubmit={handleNavigate} className="flex-1 max-w-xl mx-2">
-          <input
-            type="text"
-            value={pathInput}
-            onChange={(e) => setPathInput(e.target.value)}
-            className="w-full bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d] rounded px-2.5 py-1 text-xs text-slate-800 dark:text-gray-200 font-mono focus:outline-none focus:border-cyan-500 transition shadow-2xs"
-            placeholder="输入路径按回车..."
-          />
-        </form>
+        {/* 中间：路径面包屑与直接输入模式切换 */}
+        <div className="flex-1 max-w-xl mx-2 flex items-center space-x-1 min-w-0">
+          {isEditingPath ? (
+            <form
+              onSubmit={(e) => {
+                handleNavigate(e)
+                setIsEditingPath(false)
+              }}
+              className="flex-1"
+            >
+              <input
+                type="text"
+                autoFocus
+                value={pathInput}
+                onChange={(e) => setPathInput(e.target.value)}
+                onBlur={() => setIsEditingPath(false)}
+                className="w-full bg-white dark:bg-[#0d1117] border border-cyan-500 rounded px-2.5 py-1 text-xs text-slate-800 dark:text-gray-200 font-mono focus:outline-none shadow-2xs"
+                placeholder="输入路径按回车..."
+              />
+            </form>
+          ) : (
+            <div
+              onClick={() => setIsEditingPath(true)}
+              className="flex-1 flex items-center space-x-1 bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-[#30363d] rounded px-2 py-0.5 text-xs text-slate-800 dark:text-gray-200 font-mono overflow-x-auto no-scrollbar shadow-2xs cursor-text group"
+              title="点击输入任意路径"
+            >
+              <div className="flex items-center space-x-0.5 truncate">
+                {pathBreadcrumbs.map((crumb, idx) => (
+                  <React.Fragment key={crumb.path}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        loadDirectory(crumb.path)
+                      }}
+                      className="px-1 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-white/10 hover:text-cyan-600 dark:hover:text-cyan-400 font-medium transition text-slate-700 dark:text-gray-300"
+                    >
+                      {crumb.label}
+                    </button>
+                    {idx < pathBreadcrumbs.length - 1 && (
+                      <ChevronRight size={11} className="text-slate-400 dark:text-gray-600 shrink-0" />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+              <span className="opacity-0 group-hover:opacity-100 text-[10px] text-cyan-600 dark:text-cyan-400 font-sans ml-auto shrink-0 pl-1">
+                编辑
+              </span>
+            </div>
+          )}
+
+          {/* 常用书签快捷直达 */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowBookmarks(!showBookmarks)}
+              className={`p-1 rounded border transition ${
+                showBookmarks
+                  ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700'
+                  : 'bg-white dark:bg-white/5 text-slate-500 dark:text-gray-400 border-slate-200 dark:border-white/10 hover:text-slate-800 dark:hover:text-gray-200'
+              }`}
+              title="常用目录快速直达"
+            >
+              <Bookmark size={13} />
+            </button>
+            {showBookmarks && (
+              <div className="absolute left-0 top-7 z-30 w-52 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-xl shadow-2xl p-1 text-xs space-y-0.5 animate-in fade-in">
+                <div className="px-2 py-1 text-[10px] font-bold text-slate-400 dark:text-gray-500 border-b border-slate-200 dark:border-[#30363d] uppercase tracking-wider">
+                  常用目录直达
+                </div>
+                {COMMON_BOOKMARKS.map((bm) => (
+                  <button
+                    key={bm.path}
+                    onClick={() => {
+                      loadDirectory(bm.path)
+                      setShowBookmarks(false)
+                    }}
+                    className="w-full text-left px-2 py-1 rounded hover:bg-cyan-50 dark:hover:bg-cyan-950/60 text-slate-700 dark:text-gray-300 hover:text-cyan-700 dark:hover:text-cyan-300 flex items-center justify-between transition"
+                  >
+                    <span className="truncate">{bm.name}</span>
+                    <span className="font-mono text-[10px] text-slate-400 dark:text-gray-500">{bm.path}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* 右侧：搜索检索模式与操作按钮 */}
         <div className="flex items-center space-x-2 shrink-0">
@@ -693,18 +799,18 @@ export default function SftpFileManager({
 
       {/* 上传中横幅状态 */}
       {uploadingStatus && (
-        <div className="bg-blue-950/80 border-b border-blue-500/30 px-3 py-1 flex items-center justify-between text-xs text-blue-200">
+        <div className="bg-blue-50 dark:bg-blue-950/80 border-b border-blue-200 dark:border-blue-500/30 px-3 py-1 flex items-center justify-between text-xs text-blue-800 dark:text-blue-200">
           <div className="flex items-center space-x-2">
-            <Upload size={13} className="animate-bounce text-blue-400" />
+            <Upload size={13} className="animate-bounce text-blue-600 dark:text-blue-400" />
             <span>{uploadingStatus}</span>
           </div>
-          <span className="text-[10px] text-blue-400 font-mono">传输中...</span>
+          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">传输中...</span>
         </div>
       )}
 
       {/* 特殊检索结果提示 */}
       {customResults && (
-        <div className="bg-cyan-950/40 border-b border-cyan-500/20 px-3 py-1 flex items-center justify-between text-[11px] text-cyan-300">
+        <div className="bg-cyan-50 dark:bg-cyan-950/40 border-b border-cyan-200 dark:border-cyan-500/20 px-3 py-1 flex items-center justify-between text-[11px] text-cyan-800 dark:text-cyan-300">
           <span>
             {searchMode === 'big_files'
               ? `🔥 大文件扫描结果 (已列出大于 50MB 的 ${customResults.length} 个文件)`
@@ -712,7 +818,7 @@ export default function SftpFileManager({
           </span>
           <button
             onClick={() => setCustomResults(null)}
-            className="text-xs text-gray-400 hover:text-white underline"
+            className="text-xs text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white underline font-medium"
           >
             退出检索
           </button>

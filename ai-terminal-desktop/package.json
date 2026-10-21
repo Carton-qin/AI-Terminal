@@ -1,6 +1,6 @@
 {
   "name": "ai-terminal-desktop",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "AI Terminal - 专为开发者与全栈运维打造的下一代智能终端",
   "main": "electron/main.cjs",
   "scripts": {

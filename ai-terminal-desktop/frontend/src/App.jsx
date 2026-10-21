@@ -397,7 +397,7 @@ export default function App() {
 
     setTabChats((prev) => ({
       ...prev,
-      [activeTabId]: [loadingCard, ...(prev[activeTabId] || [])],
+      [activeTabId]: [...(prev[activeTabId] || []), loadingCard],
     }))
 
     try {

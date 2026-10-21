@@ -59,20 +59,40 @@ export default function AICopilot({
   const targetCards = (chatCards && chatCards.length ? chatCards : chatMessages) || []
   const handleClearChat = onClearChat || onResetSession
 
+  const messagesEndRef = useRef(null)
+
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+  }
+
   // 新建全新对话 / 清空当前问答历史
   const handleNewChat = () => {
     if (onClearChat) {
       onClearChat()
-    } else if (onResetSession) {
+    }
+    if (onResetSession) {
       onResetSession()
-    } else if (onUpdateChat) {
+    }
+    if (onUpdateChat) {
       onUpdateChat([])
     }
     setQuery('')
     setLoading(false)
+    setDiagResult(null)
+    if (onClearActiveError) {
+      onClearActiveError()
+    }
   }
 
   const [activeSubTab, setActiveSubTab] = useState('chat') // 'chat' | 'diagnose'
+
+  useEffect(() => {
+    scrollToBottom(false)
+  }, [activeSubTab])
+
+  useEffect(() => {
+    scrollToBottom(true)
+  }, [targetCards.length, loading])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
@@ -539,9 +559,31 @@ export default function AICopilot({
     }
     setLoading(true)
 
-    // 提取当前 Tab 独有的近期上下文对话记录
+    const pendingId = 'msg-' + Date.now()
+    const pendingCard = {
+      id: pendingId,
+      userQuery: currentQuery,
+      loading: true,
+      isCommand: false,
+      command: '',
+      explanation: '',
+      risk: null,
+      autoExecuted: false,
+      executionNote: null,
+      analyzing: false,
+      resultAnswer: null,
+    }
+
+    // 关键优化：按时间从上到下顺序排列，用户提问立即上屏展示
+    if (onUpdateChat) {
+      onUpdateChat((prevCards) => [...(prevCards || []), pendingCard])
+    }
+
+    setTimeout(() => scrollToBottom(true), 50)
+
+    // 提取当前 Tab 独有的近期上下文对话记录 (按时间升序)
     const historyList = (targetCards || [])
-      .filter((c) => c.userQuery && c.command)
+      .filter((c) => c.userQuery && c.command && !c.loading)
       .slice(-5)
       .flatMap((c) => [
         { role: 'user', content: c.userQuery },
@@ -586,10 +628,10 @@ export default function AICopilot({
         }
       }
 
-      const cardId = Date.now().toString()
-      const newCard = {
-        id: cardId,
+      const finalCard = {
+        id: pendingId,
         userQuery: currentQuery,
+        loading: false,
         isCommand: data.is_command,
         command: data.command,
         explanation: data.explanation,
@@ -601,27 +643,35 @@ export default function AICopilot({
         resultAnswer: null,
       }
 
-      const nextCards = [newCard, ...(targetCards || [])]
       if (onUpdateChat) {
-        onUpdateChat(nextCards)
+        onUpdateChat((prevCards) => {
+          const list = prevCards || []
+          return list.map((c) => (c.id === pendingId ? finalCard : c))
+        })
       }
+
+      setTimeout(() => scrollToBottom(true), 50)
 
       // 如果自动执行了命令，自动开始读取终端输出并解读回答用户的问题
       if (shouldAutoAnalyze) {
-        analyzeOutputForCard(newCard, nextCards)
+        analyzeOutputForCard(finalCard)
       }
     } catch (err) {
       if (onUpdateChat) {
-        onUpdateChat([
-          {
-            id: Date.now().toString(),
-            userQuery: currentQuery,
-            isCommand: false,
-            explanation: `请求失败: ${err.message}。请确保后端服务已启动。`,
-          },
-          ...(targetCards || []),
-        ])
+        onUpdateChat((prevCards) => {
+          const list = prevCards || []
+          return list.map((c) =>
+            c.id === pendingId
+              ? {
+                  ...c,
+                  loading: false,
+                  explanation: `请求失败: ${err.message}。请确保后端服务已启动。`,
+                }
+              : c
+          )
+        })
       }
+      setTimeout(() => scrollToBottom(true), 50)
     } finally {
       setLoading(false)
     }
@@ -769,7 +819,7 @@ export default function AICopilot({
     sessionDetails?.os_info?.username || (targetTab?.type === 'ssh' ? 'root' : 'user')
 
   return (
-    <aside className="w-80 bg-white dark:bg-[#161b22] border-l border-slate-200 dark:border-[#30363d] flex flex-col h-full shrink-0 select-none transition-colors text-slate-800 dark:text-gray-200">
+    <aside className="w-96 bg-white dark:bg-[#161b22] border-l border-slate-200 dark:border-[#30363d] flex flex-col h-full shrink-0 select-none transition-colors text-slate-800 dark:text-gray-200">
       {/* 侧边栏顶部状态栏 */}
       <div className="h-12 border-b border-slate-200 dark:border-[#30363d] flex items-center justify-between px-3 bg-slate-50 dark:bg-[#161b22]">
         <div className="flex items-center space-x-2 min-w-0">
@@ -779,13 +829,23 @@ export default function AICopilot({
             已就绪
           </span>
         </div>
-        <button
-          onClick={onToggleCollapse}
-          className="p-1 text-slate-400 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-[#21262d] rounded transition"
-          title="折叠侧边栏"
-        >
-          <ChevronRight size={16} />
-        </button>
+        <div className="flex items-center space-x-1.5 shrink-0">
+          <button
+            onClick={handleNewChat}
+            className="flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-medium bg-cyan-600 hover:bg-cyan-500 text-white transition shadow-xs"
+            title="开启全新对话，清空当前问答历史"
+          >
+            <Plus size={12} />
+            <span>新建对话</span>
+          </button>
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 text-slate-400 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-[#21262d] rounded transition"
+            title="折叠侧边栏"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
 
       {/* 🎯 当前激活会话环境感知与控制面板 */}
@@ -992,8 +1052,16 @@ export default function AICopilot({
               >
                 {/* 提问标题 */}
                 <div className="font-medium text-slate-800 dark:text-gray-300 pb-1 border-b border-slate-200 dark:border-[#21262d] flex justify-between items-center">
-                  <span className="truncate pr-2">💬 {card.userQuery}</span>
+                  <span className="truncate pr-2 font-semibold text-slate-900 dark:text-gray-200">
+                    💬 {card.userQuery}
+                  </span>
                   <div className="flex items-center space-x-1 shrink-0">
+                    {card.loading && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950/70 text-cyan-800 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800 font-mono flex items-center space-x-1">
+                        <RefreshCw size={10} className="animate-spin text-cyan-600 dark:text-cyan-400" />
+                        <span>生成中...</span>
+                      </span>
+                    )}
                     {card.autoExecuted && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-100 dark:bg-cyan-950/70 text-cyan-800 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800 font-mono">
                         ⚡ 已自执行
@@ -1018,6 +1086,16 @@ export default function AICopilot({
                     )}
                   </div>
                 </div>
+
+                {card.loading ? (
+                  <div className="py-2.5 px-3 bg-white/70 dark:bg-[#161b22]/70 rounded-lg border border-slate-200 dark:border-[#21262d] flex items-center space-x-2 text-cyan-700 dark:text-cyan-300">
+                    <Sparkles size={14} className="animate-spin text-cyan-500 shrink-0" />
+                    <span className="text-xs font-medium animate-pulse">
+                      AI 正在分析终端上下文并生成专属回答与命令...
+                    </span>
+                  </div>
+                ) : (
+                  <>
 
                 {/* 生成的代码块 */}
                 {card.isCommand && card.command && (
@@ -1149,8 +1227,11 @@ export default function AICopilot({
                     </button>
                   </div>
                 )}
+              </>
+            )}
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* 终端实时视口感知状态与快速诊断胶囊 */}

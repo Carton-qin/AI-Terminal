@@ -22,7 +22,7 @@ const getPercentColor = (percent) => {
   return 'text-emerald-600 dark:text-emerald-400 bg-emerald-500 dark:bg-emerald-500'
 }
 
-export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
+export default function VpsStatusBar({ activeTab, visible = true, onClose, onExpandChange }) {
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isExpanded, setIsExpanded] = useState(false) // 紧凑模式 vs 详细仪表盘展开模式
@@ -192,7 +192,11 @@ export default function VpsStatusBar({ activeTab, visible = true, onClose }) {
         {/* 右侧展开与关闭 */}
         <div className="flex items-center space-x-1 shrink-0 pl-1 border-l border-slate-200 dark:border-white/10">
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => {
+              const next = !isExpanded
+              setIsExpanded(next)
+              if (onExpandChange) onExpandChange(next)
+            }}
             className="p-1 text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10 rounded transition"
             title={isExpanded ? '收起详情仪表盘' : '展开详细性能监控卡片'}
           >

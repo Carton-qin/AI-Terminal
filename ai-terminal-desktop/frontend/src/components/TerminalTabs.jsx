@@ -20,6 +20,9 @@ import {
   WifiOff,
   Sun,
   Moon,
+  Copy,
+  Clipboard,
+  CheckSquare,
 } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -333,11 +336,39 @@ export default function TerminalTabs({
     return saved !== null ? saved === 'true' : true
   })
 
-  // SFTP 管理面板显隐
+  // SFTP 管理面板显隐 (默认不开启，终端默认高度为 100%)
   const [showFileManager, setShowFileManager] = useState(() => {
     const saved = localStorage.getItem('aiterm_show_file_manager')
-    return saved !== null ? saved === 'true' : true
+    return saved === 'true'
   })
+
+  // 终端右键菜单状态
+  const [contextMenu, setContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    tabId: null,
+    hasSelection: false,
+    selectionText: '',
+  })
+
+  // 监听全局点击与按键以关闭右键菜单
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setContextMenu((prev) => (prev.visible ? { ...prev, visible: false } : prev))
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setContextMenu((prev) => (prev.visible ? { ...prev, visible: false } : prev))
+      }
+    }
+    window.addEventListener('click', handleGlobalClick)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('click', handleGlobalClick)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   // 终端当前工作目录
   const [tabCwds, setTabCwds] = useState({})
@@ -408,18 +439,42 @@ export default function TerminalTabs({
       visibleIds.forEach((id) => {
         const item = terminalRefs.current[id]
         const container = containerRefs.current[id]
-        if (item?.fitAddon && container) {
+        if (item?.fitAddon && item?.term && container) {
           const w = container.clientWidth
           const h = container.clientHeight
           if (w >= 150 && h >= 80) {
             try {
               item.fitAddon.fit()
+              item.term.scrollToBottom()
             } catch (e) {}
           }
         }
       })
     })
   }
+
+  // 核心：ResizeObserver 实时监控每个终端容器尺寸变动
+  // 无论 SFTP 面板打开/关闭/高度拖拽，还是 VPS 监控栏展开/折叠，均能无缝自适应并保证底部 Prompt 始终可见
+  useEffect(() => {
+    let animId = null
+    const ro = new ResizeObserver(() => {
+      if (animId) cancelAnimationFrame(animId)
+      animId = requestAnimationFrame(() => {
+        fitVisibleTerminals()
+      })
+    })
+
+    Object.values(containerRefs.current).forEach((el) => {
+      if (el) {
+        ro.observe(el)
+      }
+    })
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId)
+      ro.disconnect()
+    }
+  }, [tabs, splitMode, splitTabId, showFileManager, showVpsMetrics])
 
   // 确保终端元素附着在活动 DOM 容器中并自适应（解决分屏关闭窗口时终端丢失问题）
   const ensureTerminalsAttachedAndFit = () => {
@@ -755,6 +810,65 @@ export default function TerminalTabs({
         } catch (e) {}
       }
 
+      // 增强复制粘贴快捷键监听 (Mac: Cmd+C/Cmd+V, Windows/Linux: Ctrl+C/Ctrl+V / Ctrl+Shift+C/V)
+      term.attachCustomKeyEventHandler((event) => {
+        if (event.type !== 'keydown') return true
+
+        const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+        const isCmdOrCtrl = isMac ? event.metaKey : event.ctrlKey
+        const key = event.key.toLowerCase()
+
+        // 1. 复制操作：(Cmd/Ctrl + C) 或 (Ctrl + Shift + C)
+        const isCopyShortcut =
+          (isCmdOrCtrl && key === 'c') ||
+          (event.ctrlKey && event.shiftKey && key === 'c')
+
+        if (isCopyShortcut && term.hasSelection()) {
+          const selectedText = term.getSelection()
+          if (selectedText) {
+            navigator.clipboard.writeText(selectedText).catch((err) => {
+              console.warn('Clipboard writeText failed:', err)
+            })
+          }
+          return false // 拦截事件，避免向远端进程发送中断信号 SIGINT (^C)
+        }
+
+        // 2. 粘贴操作：(Cmd/Ctrl + V) 或 (Ctrl + Shift + V)
+        const isPasteShortcut =
+          (isCmdOrCtrl && key === 'v') ||
+          (event.ctrlKey && event.shiftKey && key === 'v')
+
+        if (isPasteShortcut) {
+          navigator.clipboard.readText().then((clipText) => {
+            if (clipText) {
+              if (isBroadcastingRef.current) {
+                Object.values(terminalRefs.current).forEach((target) => {
+                  if (target?.ws && target.ws.readyState === WebSocket.OPEN) {
+                    target.ws.send(clipText)
+                  }
+                })
+              } else {
+                const targetWs = terminalRefs.current[id]?.ws || ws
+                if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                  targetWs.send(clipText)
+                }
+              }
+            }
+          }).catch((err) => {
+            console.warn('Clipboard readText failed:', err)
+          })
+          return false // 拦截事件，避免向终端写入 ^V 控制字符
+        }
+
+        // 3. 全选操作：(Cmd + A) 或 (Ctrl + Shift + A)
+        if ((isMac && event.metaKey && key === 'a') || (!isMac && event.ctrlKey && event.shiftKey && key === 'a')) {
+          term.selectAll()
+          return false
+        }
+
+        return true
+      })
+
       const ws = setupWebSocket(tab, term, false)
 
       term.onData((data) => {
@@ -927,6 +1041,80 @@ export default function TerminalTabs({
       item.term.clear()
       item.term.focus()
     }
+  }
+
+  // 终端右键菜单事件响应
+  const handleTerminalContextMenu = (e, tabId) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const termItem = terminalRefs.current[tabId]
+    const selection = termItem?.term ? termItem.term.getSelection() : ''
+    const menuWidth = 190
+    const menuHeight = 220
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10)
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10)
+    setContextMenu({
+      visible: true,
+      x: Math.max(10, x),
+      y: Math.max(10, y),
+      tabId,
+      hasSelection: Boolean(selection && selection.trim().length > 0),
+      selectionText: selection || '',
+    })
+  }
+
+  const handleMenuCopy = () => {
+    if (contextMenu.selectionText) {
+      navigator.clipboard.writeText(contextMenu.selectionText).catch((err) => {
+        console.warn('Clipboard write failed:', err)
+      })
+    }
+    setContextMenu((prev) => ({ ...prev, visible: false }))
+  }
+
+  const handleMenuPaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text && contextMenu.tabId) {
+        const item = terminalRefs.current[contextMenu.tabId]
+        if (item?.ws && item.ws.readyState === WebSocket.OPEN) {
+          if (isBroadcastingRef.current) {
+            Object.values(terminalRefs.current).forEach((target) => {
+              if (target?.ws && target.ws.readyState === WebSocket.OPEN) {
+                target.ws.send(text)
+              }
+            })
+          } else {
+            item.ws.send(text)
+          }
+          item.term.focus()
+        }
+      }
+    } catch (err) {
+      console.warn('Clipboard read error:', err)
+    }
+    setContextMenu((prev) => ({ ...prev, visible: false }))
+  }
+
+  const handleMenuSelectAll = () => {
+    if (contextMenu.tabId) {
+      terminalRefs.current[contextMenu.tabId]?.term?.selectAll()
+    }
+    setContextMenu((prev) => ({ ...prev, visible: false }))
+  }
+
+  const handleMenuClear = () => {
+    if (contextMenu.tabId) {
+      handleClearTerminal(contextMenu.tabId)
+    }
+    setContextMenu((prev) => ({ ...prev, visible: false }))
+  }
+
+  const handleMenuAskAi = () => {
+    if (contextMenu.selectionText && onAskAi) {
+      onAskAi(`请帮我分析以下终端输出内容并给出解释或排查方案:\n\n${contextMenu.selectionText}`)
+    }
+    setContextMenu((prev) => ({ ...prev, visible: false }))
   }
 
   const applyColorPrompt = (tabId) => {
@@ -1343,12 +1531,13 @@ export default function TerminalTabs({
               activeTab={effectiveActiveTab}
               visible={showVpsMetrics}
               onClose={() => setShowVpsMetrics(false)}
+              onExpandChange={() => requestAnimationFrame(fitVisibleTerminals)}
             />
 
             {/* 终端画布主体区域 (支持单屏与分屏模式，单套持久容器彻底杜绝终端丢失) */}
-            <div className="flex-1 p-2 overflow-hidden relative flex flex-col">
+            <div className="flex-1 min-h-0 p-2 overflow-hidden relative flex flex-col">
               <div
-                className={`w-full h-full ${
+                className={`w-full h-full min-h-0 ${
                   splitMode === 'vertical'
                     ? 'flex flex-row space-x-2'
                     : splitMode === 'horizontal'
@@ -1364,13 +1553,13 @@ export default function TerminalTabs({
 
                   let paneLayoutClasses = ''
                   if (splitMode === 'vertical') {
-                    paneLayoutClasses = isVisible ? 'w-1/2 h-full flex flex-col relative' : 'hidden'
+                    paneLayoutClasses = isVisible ? 'w-1/2 h-full min-h-0 flex flex-col relative' : 'hidden'
                   } else if (splitMode === 'horizontal') {
-                    paneLayoutClasses = isVisible ? 'w-full h-1/2 flex flex-col relative' : 'hidden'
+                    paneLayoutClasses = isVisible ? 'w-full h-1/2 min-h-0 flex flex-col relative' : 'hidden'
                   } else {
                     paneLayoutClasses = isMain
-                      ? 'w-full h-full absolute inset-0 flex flex-col z-10 visible opacity-100'
-                      : 'w-full h-full absolute inset-0 flex flex-col z-0 invisible opacity-0 pointer-events-none'
+                      ? 'w-full h-full min-h-0 absolute inset-0 flex flex-col z-10 visible opacity-100'
+                      : 'w-full h-full min-h-0 absolute inset-0 flex flex-col z-0 invisible opacity-0 pointer-events-none'
                   }
 
                   return (
@@ -1443,7 +1632,7 @@ export default function TerminalTabs({
                       )}
 
                       {/* 终端实例真实挂载 DOM 容器 */}
-                      <div className="flex-1 w-full h-full relative overflow-hidden">
+                      <div className="flex-1 min-h-0 w-full h-full relative overflow-hidden">
                         <div
                           ref={(el) => {
                             containerRefs.current[tab.id] = el
@@ -1455,12 +1644,14 @@ export default function TerminalTabs({
                                   requestAnimationFrame(() => {
                                     try {
                                       terminalRefs.current[tab.id]?.fitAddon?.fit()
+                                      terminalRefs.current[tab.id]?.term?.scrollToBottom()
                                     } catch (e) {}
                                   })
                                 }
                               }
                             }
                           }}
+                          onContextMenu={(e) => handleTerminalContextMenu(e, tab.id)}
                           className="w-full h-full"
                         />
 
@@ -1581,6 +1772,73 @@ export default function TerminalTabs({
         hosts={hosts}
         onRefreshHosts={onRefreshHosts}
       />
+
+      {/* 终端右键上下文快捷菜单 */}
+      {contextMenu.visible && (
+        <div
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          className="fixed z-50 min-w-[170px] bg-white dark:bg-[#161b22] border border-slate-200 dark:border-[#30363d] rounded-xl shadow-2xl py-1 text-xs select-none animate-in fade-in zoom-in-95 duration-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={handleMenuCopy}
+            disabled={!contextMenu.hasSelection}
+            className="w-full px-3 py-1.5 flex items-center justify-between text-left hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none text-slate-700 dark:text-gray-200 transition"
+          >
+            <span className="flex items-center space-x-2">
+              <Copy size={13} className="text-cyan-500" />
+              <span>复制 (Copy)</span>
+            </span>
+            <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono">⌘C / Ctrl+C</span>
+          </button>
+
+          <button
+            onClick={handleMenuPaste}
+            className="w-full px-3 py-1.5 flex items-center justify-between text-left hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-gray-200 transition"
+          >
+            <span className="flex items-center space-x-2">
+              <Clipboard size={13} className="text-emerald-500" />
+              <span>粘贴 (Paste)</span>
+            </span>
+            <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono">⌘V / Ctrl+V</span>
+          </button>
+
+          {contextMenu.hasSelection && onAskAi && (
+            <button
+              onClick={handleMenuAskAi}
+              className="w-full px-3 py-1.5 flex items-center justify-between text-left hover:bg-cyan-50 dark:hover:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 transition font-medium border-t border-b border-slate-100 dark:border-white/5 my-0.5"
+            >
+              <span className="flex items-center space-x-2">
+                <Sparkles size={13} className="text-cyan-500" />
+                <span>发送给 AI 分析</span>
+              </span>
+            </button>
+          )}
+
+          <div className="h-px bg-slate-100 dark:bg-white/10 my-1" />
+
+          <button
+            onClick={handleMenuSelectAll}
+            className="w-full px-3 py-1.5 flex items-center justify-between text-left hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-gray-200 transition"
+          >
+            <span className="flex items-center space-x-2">
+              <CheckSquare size={13} className="text-blue-500" />
+              <span>全选 (Select All)</span>
+            </span>
+            <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono">⌘A</span>
+          </button>
+
+          <button
+            onClick={handleMenuClear}
+            className="w-full px-3 py-1.5 flex items-center justify-between text-left hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-gray-200 transition"
+          >
+            <span className="flex items-center space-x-2">
+              <RotateCcw size={13} className="text-amber-500" />
+              <span>清屏 (Clear)</span>
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

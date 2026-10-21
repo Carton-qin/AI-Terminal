@@ -85,14 +85,6 @@ export default function AICopilot({
   }
 
   const [activeSubTab, setActiveSubTab] = useState('chat') // 'chat' | 'diagnose'
-
-  useEffect(() => {
-    scrollToBottom(false)
-  }, [activeSubTab])
-
-  useEffect(() => {
-    scrollToBottom(true)
-  }, [targetCards.length, loading])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
@@ -125,6 +117,15 @@ export default function AICopilot({
 
   const agentAbortRef = useRef(false)
   const agentDangerDecisionRef = useRef(null)
+
+  // 自动滚动到问答末尾
+  useEffect(() => {
+    scrollToBottom(false)
+  }, [activeSubTab])
+
+  useEffect(() => {
+    scrollToBottom(true)
+  }, [targetCards.length, loading])
 
   const agentPresets = [
     { label: '🔍 80端口与Web排查', task: '排查 80 端口被谁占用，定位并修复 Web 服务无法访问问题' },

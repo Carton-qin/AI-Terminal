@@ -430,11 +430,15 @@ export default function SettingsModal({ isOpen, onClose }) {
                   <div className="text-[10px] text-cyan-600 dark:text-cyan-400 mt-1 flex items-center justify-between">
                     <span>✓ 已成功从接口拉取到 {availableModels.length} 个可用模型</span>
                   </div>
-                  {/(?:sol|embedding|realtime|responses)/i.test(config.model) && (
-                    <div className="mt-1.5 p-1.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[10px] text-amber-700 dark:text-amber-300 leading-normal">
-                      ⚠️ 提示：模型「{config.model}」疑似非通用对话模型。若在终端提问时提示 400 接口不支持，请下拉切换为 claude-3-5-sonnet 等通用聊天模型。
+                  {/(?:sol|astra)/i.test(config.model) ? (
+                    <div className="mt-1.5 p-1.5 rounded bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-300 dark:border-cyan-800 text-[10px] text-cyan-700 dark:text-cyan-300 leading-normal">
+                      ✨ 提示：模型「{config.model}」已开启 OpenAI Responses 协议原生无感适配。
                     </div>
-                  )}
+                  ) : /(?:embedding|realtime|moderation|tts|whisper)/i.test(config.model) ? (
+                    <div className="mt-1.5 p-1.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[10px] text-amber-700 dark:text-amber-300 leading-normal">
+                      ⚠️ 提示：模型「{config.model}」疑似非文本对话模型，请优先选用通用模型。
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div>

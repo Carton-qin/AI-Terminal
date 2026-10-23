@@ -231,34 +231,44 @@ class LLMClient:
                     return msg["content"] or ""
         return json.dumps(data, ensure_ascii=False)
 
-    def _call_completion(self, messages: List[dict], temperature: Optional[float] = None) -> str:
-        """统一调用 LLM 接口，具备 /v1/responses 自动降级与智能重试机制"""
-        target_model = (self.config.model or "").lower()
-        # 若模型名明确带 -sol，说明是专有 Responses API 模型（如 gpt-5.6-sol, gpt-6.1-sol），优先走 responses 接口
-        if "-sol" in target_model:
+    def _call_responses_api(self, messages: List[dict]) -> str:
+        """调用 OpenAI Responses API (/v1/responses)，注意：推理与专项模型严格不支持 temperature 参数"""
+        resp_url = f"{self.base_url}/responses"
+        # 兼容性 input 处理：如果传入 messages 列表，某些端点要求输入纯文本或标准 input 结构
+        payload = {
+            "model": self.config.model,
+            "input": messages,
+        }
+        r = self.http_client.post(resp_url, json=payload, timeout=float(self.config.timeout))
+        if r.is_success:
+            extracted = self._extract_from_responses_api(r.json())
+            if extracted and extracted.strip():
+                return extracted
+            raise Exception("Responses API 返回了空内容")
+        else:
             try:
-                resp_url = f"{self.base_url}/responses"
-                payload = {
-                    "model": self.config.model,
-                    "input": messages,
-                    "temperature": temperature if temperature is not None else self.config.temperature,
-                }
-                r = self.http_client.post(resp_url, json=payload, timeout=float(self.config.timeout))
-                if r.is_success:
-                    extracted = self._extract_from_responses_api(r.json())
-                    if extracted and extracted.strip():
-                        return extracted
-                elif r.status_code in (400, 401, 402, 503):
-                    try:
-                        r_json = r.json()
-                        err_info = r_json.get("error", {}).get("message", r.text)
-                    except Exception:
-                        err_info = r.text
-                    raise Exception(f"{r.status_code} - {err_info}")
-            except Exception as e:
-                # 若直接报错则抛出指引
-                raise e
+                r_json = r.json()
+                err_info = r_json.get("error", {}).get("message", r.text)
+            except Exception:
+                err_info = r.text
+            raise Exception(f"{r.status_code} - {err_info}")
 
+    def _call_completion(self, messages: List[dict], temperature: Optional[float] = None) -> str:
+        """统一调用 LLM 接口，具备 /v1/responses 与温度参数兼容处理机制"""
+        target_model = (self.config.model or "").lower()
+        is_agentrouter = "agentrouter" in self.base_url or "air-outer" in self.base_url
+        is_responses_model = any(k in target_model for k in ["-sol", "-astra", "gpt-6", "gpt-5.6"])
+
+        # AgentRouter 网关的所有 GPT 模型（如 gpt-6-astra, gpt-5.6-sol 等）均强制要求使用 /v1/responses 且严格不支持 temperature
+        if is_agentrouter or is_responses_model:
+            try:
+                return self._call_responses_api(messages)
+            except Exception as e:
+                # 若来自明确的 AgentRouter 网关，直接抛出，不走 chat.completions
+                if is_agentrouter:
+                    raise e
+
+        # 标准 OpenAI chat.completions
         try:
             response = self.client.chat.completions.create(
                 model=self.config.model,
@@ -268,27 +278,21 @@ class LLMClient:
             return response.choices[0].message.content or ""
         except Exception as e:
             err_str = str(e).lower()
-            # 如果中转服务商提示不支持 /v1/chat/completions，自动尝试改用 /v1/responses
+            # 兼容某些推理模型（如 o1, o3）不支持 temperature 参数的报错
+            if "temperature" in err_str and "unsupported" in err_str:
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.config.model,
+                        messages=messages,
+                    )
+                    return response.choices[0].message.content or ""
+                except Exception:
+                    pass
+
+            # 若提示必须改用 /v1/responses，自动回退到 responses 接口调用（不带 temperature）
             if "responses" in err_str or "400" in err_str:
                 try:
-                    resp_url = f"{self.base_url}/responses"
-                    payload = {
-                        "model": self.config.model,
-                        "input": messages,
-                        "temperature": temperature if temperature is not None else self.config.temperature,
-                    }
-                    r = self.http_client.post(resp_url, json=payload, timeout=float(self.config.timeout))
-                    if r.is_success:
-                        extracted = self._extract_from_responses_api(r.json())
-                        if extracted and extracted.strip():
-                            return extracted
-                    elif r.status_code in (400, 401, 402, 503):
-                        try:
-                            r_json = r.json()
-                            err_info = r_json.get("error", {}).get("message", r.text)
-                        except Exception:
-                            err_info = r.text
-                        raise Exception(f"{r.status_code} - {err_info}")
+                    return self._call_responses_api(messages)
                 except Exception:
                     pass
             raise e

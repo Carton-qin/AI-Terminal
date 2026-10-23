@@ -190,11 +190,107 @@ class LLMClient:
             timeout=float(self.config.timeout),
             headers=default_headers,
         )
+        self.http_client = http_client
+        self.base_url = base_url
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
             http_client=http_client,
         )
+
+    def _extract_from_responses_api(self, data: dict) -> str:
+        """从 OpenAI Responses API 响应结构中提取内容文本"""
+        if isinstance(data, dict):
+            if "output_text" in data and isinstance(data["output_text"], str):
+                return data["output_text"]
+            outputs = data.get("output")
+            if isinstance(outputs, list) and outputs:
+                parts = []
+                for item in outputs:
+                    if isinstance(item, str):
+                        parts.append(item)
+                    elif isinstance(item, dict):
+                        content = item.get("content")
+                        if isinstance(content, str):
+                            parts.append(content)
+                        elif isinstance(content, list):
+                            for sub in content:
+                                if isinstance(sub, dict) and "text" in sub:
+                                    parts.append(str(sub["text"]))
+                                elif isinstance(sub, str):
+                                    parts.append(sub)
+                        elif "text" in item:
+                            parts.append(str(item["text"]))
+                if parts:
+                    return "\n".join(parts)
+            choices = data.get("choices")
+            if isinstance(choices, list) and choices:
+                msg = choices[0].get("message", {})
+                if isinstance(msg, dict) and "content" in msg:
+                    return msg["content"] or ""
+        return json.dumps(data, ensure_ascii=False)
+
+    def _call_completion(self, messages: List[dict], temperature: Optional[float] = None) -> str:
+        """统一调用 LLM 接口，具备 /v1/responses 自动降级与智能重试机制"""
+        try:
+            response = self.client.chat.completions.create(
+                model=self.config.model,
+                messages=messages,
+                temperature=temperature if temperature is not None else self.config.temperature,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            err_str = str(e).lower()
+            # 如果中转服务商提示不支持 /v1/chat/completions，自动尝试改用 /v1/responses
+            if "responses" in err_str:
+                try:
+                    resp_url = f"{self.base_url}/responses"
+                    payload = {
+                        "model": self.config.model,
+                        "input": messages,
+                        "temperature": temperature if temperature is not None else self.config.temperature,
+                    }
+                    r = self.http_client.post(resp_url, json=payload, timeout=float(self.config.timeout))
+                    if r.is_success:
+                        extracted = self._extract_from_responses_api(r.json())
+                        if extracted and extracted.strip():
+                            return extracted
+                except Exception:
+                    pass
+            raise e
+
+    def _format_error_guidance(self, err: Exception) -> str:
+        err_msg = str(err)
+        guidance = ""
+        if "无可用渠道" in err_msg or "503" in err_msg:
+            guidance = (
+                f"\n\n💡【排障指引】\n"
+                f"• 原因：中转服务商未为模型「{self.config.model}」配置或开启可用渠道（渠道失效、未分配或限流）。\n"
+                f"• 解决：请点击设置⚙️，在「使用的大模型」中切换为可用模型（如 claude-3-5-sonnet、deepseek-chat 或 gpt-4o）。"
+            )
+        elif "responses" in err_msg.lower() or "400" in err_msg:
+            guidance = (
+                f"\n\n💡【排障指引】\n"
+                f"• 原因：模型「{self.config.model}」为非标准对话模型（如 Responses/Search 专项模型），服务商限制只能通过 responses 接口访问。\n"
+                f"• 解决：请点击设置⚙️，切换为通用聊天模型（如 claude-3-5-sonnet、claude-3-7-sonnet 或 deepseek-chat）。"
+            )
+        elif "401" in err_msg or "unauthorized" in err_msg.lower() or "invalid api key" in err_msg.lower():
+            guidance = (
+                f"\n\n💡【排障指引】\n"
+                f"• 原因：API Key 认证失败或已失效。\n"
+                f"• 解决：请在设置⚙️中检查并重新填入正确的 API Key。"
+            )
+        else:
+            guidance = "\n请检查网络连接、API Key 与 Base URL 设置。"
+        return f"请求大模型 API 出现异常: {err_msg}{guidance}"
+
+    def chat_completion(self, system_prompt: str, user_message: str, temperature: float = 0.2) -> str:
+        """通用问答接口"""
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+        return self._call_completion(messages, temperature=temperature)
 
     def _extract_json(self, text: str) -> Optional[dict]:
         """容错解析模型返回的 JSON（支持反引号代码块包裹或裸 JSON）"""
@@ -260,12 +356,7 @@ class LLMClient:
 
         try:
             # 优先尝试 json_object，但某些非标准服务商不支持则回退
-            response = self.client.chat.completions.create(
-                model=self.config.model,
-                messages=messages,
-                temperature=self.config.temperature,
-            )
-            raw_text = response.choices[0].message.content or ""
+            raw_text = self._call_completion(messages, temperature=self.config.temperature)
             data = self._extract_json(raw_text)
 
             if data and isinstance(data, dict):
@@ -305,7 +396,7 @@ class LLMClient:
             return CommandProposal(
                 is_command=False,
                 command=None,
-                explanation=f"请求大模型 API 出现异常: {str(e)}\n请检查网络连接、API Key 与 Base URL 设置。",
+                explanation=self._format_error_guidance(e),
                 raw_reply="",
             )
 
@@ -328,15 +419,13 @@ class LLMClient:
         )
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.config.model,
-                messages=[
+            raw_text = self._call_completion(
+                [
                     {"role": "system", "content": "你是一位资深的 Linux 运维排障专家。"},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
             )
-            raw_text = response.choices[0].message.content or ""
             data = self._extract_json(raw_text)
 
             if data and isinstance(data, dict):
@@ -358,7 +447,7 @@ class LLMClient:
             return DiagnosticProposal(
                 root_cause=f"诊断请求失败: {str(e)}",
                 fix_command=None,
-                explanation="",
+                explanation=self._format_error_guidance(e),
                 raw_reply="",
             )
 
@@ -369,14 +458,9 @@ class LLMClient:
             f"采用清晰的 Markdown 列表展现：\n`{command}`"
         )
         try:
-            response = self.client.chat.completions.create(
-                model=self.config.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-            )
-            return response.choices[0].message.content or "无返回内容"
+            return self._call_completion([{"role": "user", "content": prompt}], temperature=0.2)
         except Exception as e:
-            return f"获取命令参数拆解失败: {str(e)}"
+            return self._format_error_guidance(e)
 
     def analyze_command_output(
         self,
@@ -397,17 +481,15 @@ class LLMClient:
         )
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.config.model,
-                messages=[
+            return self._call_completion(
+                [
                     {"role": "system", "content": "你是一位专业的 Linux 系统架构师与终端 AI 助手，善于从命令输出中提炼核心结论直接回答用户。"},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
             )
-            return response.choices[0].message.content or "未能从输出中提取出有效结论。"
         except Exception as e:
-            return f"解读执行结果时请求失败: {str(e)}"
+            return self._format_error_guidance(e)
 
     def agent_step(
         self,
@@ -455,12 +537,7 @@ class LLMClient:
         ]
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.config.model,
-                messages=messages,
-                temperature=0.2,
-            )
-            content = response.choices[0].message.content or ""
+            content = self._call_completion(messages, temperature=0.2)
             data = self._extract_json(content)
 
             if not data:
@@ -491,7 +568,7 @@ class LLMClient:
                 thought=f"调用模型接口异常: {str(e)}",
                 command=None,
                 status="BLOCKED",
-                final_report=f"Agent 排查中断: {str(e)}",
+                final_report=self._format_error_guidance(e),
                 raw_reply="",
             )
 

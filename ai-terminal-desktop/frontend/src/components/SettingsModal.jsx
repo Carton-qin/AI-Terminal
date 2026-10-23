@@ -115,9 +115,29 @@ export default function SettingsModal({ isOpen, onClose }) {
       setAvailableModels(list)
       setIsManualModelInput(false)
 
-      // 如果当前模型不在列表中且列表不为空，自动选中第一个
+      // 智能识别可用模型：优先推荐常见的标准聊天模型，避免自动选中 non-chat / responses-only 专项模型（如 gpt-5.6-sol）
       if (list.length > 0 && !list.includes(config.model)) {
-        setConfig((prev) => ({ ...prev, model: list[0] }))
+        const preferredKeywords = [
+          'claude-3-7-sonnet',
+          'claude-3-5-sonnet',
+          'claude-3-5-haiku',
+          'deepseek-chat',
+          'deepseek-v3',
+          'deepseek-r1',
+          'gpt-4o',
+          'gpt-4o-mini',
+          'qwen',
+        ]
+        const matched = list.find((m) =>
+          preferredKeywords.some((pref) => m.toLowerCase().includes(pref))
+        )
+        if (matched) {
+          setConfig((prev) => ({ ...prev, model: matched }))
+        } else {
+          // 避开明确带有非标准聊天标记（如 sol, embedding, realtime, moderation, tts, whisper）的模型
+          const validChat = list.filter((m) => !/(?:sol|embedding|realtime|moderation|tts|whisper|dall-e)/i.test(m))
+          setConfig((prev) => ({ ...prev, model: validChat.length > 0 ? validChat[0] : list[0] }))
+        }
       }
     } catch (err) {
       setModelFetchError(err.message)
@@ -407,9 +427,14 @@ export default function SettingsModal({ isOpen, onClose }) {
                     size={14}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-cyan-500 dark:text-cyan-400 pointer-events-none"
                   />
-                  <div className="text-[10px] text-cyan-600 dark:text-cyan-400 mt-1">
-                    ✓ 已成功从接口拉取到 {availableModels.length} 个可用模型
+                  <div className="text-[10px] text-cyan-600 dark:text-cyan-400 mt-1 flex items-center justify-between">
+                    <span>✓ 已成功从接口拉取到 {availableModels.length} 个可用模型</span>
                   </div>
+                  {/(?:sol|embedding|realtime|responses)/i.test(config.model) && (
+                    <div className="mt-1.5 p-1.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[10px] text-amber-700 dark:text-amber-300 leading-normal">
+                      ⚠️ 提示：模型「{config.model}」疑似非通用对话模型。若在终端提问时提示 400 接口不支持，请下拉切换为 claude-3-5-sonnet 等通用聊天模型。
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>

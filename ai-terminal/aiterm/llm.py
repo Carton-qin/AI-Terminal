@@ -178,8 +178,9 @@ class LLMClient:
             base_url = f"{base_url}/v1"
 
         default_headers = dict(self.config.extra_headers or {})
-        # 针对 AgentRouter (agentrouter.org) 等平台的 WAF 指纹校验自动注入客户端签名
-        if "agentrouter.org" in base_url:
+        default_headers["Authorization"] = f"Bearer {api_key}"
+        # 针对 AgentRouter (agentrouter.org / ps.air-outer.com) 等平台的 WAF 指纹校验自动注入客户端签名
+        if "agentrouter" in base_url or "air-outer" in base_url:
             default_headers["User-Agent"] = "claude-cli/2.1.195 (external, cli)"
             default_headers["originator"] = "codex_cli_rs"
         elif "User-Agent" not in default_headers:
@@ -232,6 +233,32 @@ class LLMClient:
 
     def _call_completion(self, messages: List[dict], temperature: Optional[float] = None) -> str:
         """统一调用 LLM 接口，具备 /v1/responses 自动降级与智能重试机制"""
+        target_model = (self.config.model or "").lower()
+        # 若模型名明确带 -sol，说明是专有 Responses API 模型（如 gpt-5.6-sol, gpt-6.1-sol），优先走 responses 接口
+        if "-sol" in target_model:
+            try:
+                resp_url = f"{self.base_url}/responses"
+                payload = {
+                    "model": self.config.model,
+                    "input": messages,
+                    "temperature": temperature if temperature is not None else self.config.temperature,
+                }
+                r = self.http_client.post(resp_url, json=payload, timeout=float(self.config.timeout))
+                if r.is_success:
+                    extracted = self._extract_from_responses_api(r.json())
+                    if extracted and extracted.strip():
+                        return extracted
+                elif r.status_code in (400, 401, 402, 503):
+                    try:
+                        r_json = r.json()
+                        err_info = r_json.get("error", {}).get("message", r.text)
+                    except Exception:
+                        err_info = r.text
+                    raise Exception(f"{r.status_code} - {err_info}")
+            except Exception as e:
+                # 若直接报错则抛出指引
+                raise e
+
         try:
             response = self.client.chat.completions.create(
                 model=self.config.model,
@@ -242,7 +269,7 @@ class LLMClient:
         except Exception as e:
             err_str = str(e).lower()
             # 如果中转服务商提示不支持 /v1/chat/completions，自动尝试改用 /v1/responses
-            if "responses" in err_str:
+            if "responses" in err_str or "400" in err_str:
                 try:
                     resp_url = f"{self.base_url}/responses"
                     payload = {
@@ -255,6 +282,13 @@ class LLMClient:
                         extracted = self._extract_from_responses_api(r.json())
                         if extracted and extracted.strip():
                             return extracted
+                    elif r.status_code in (400, 401, 402, 503):
+                        try:
+                            r_json = r.json()
+                            err_info = r_json.get("error", {}).get("message", r.text)
+                        except Exception:
+                            err_info = r.text
+                        raise Exception(f"{r.status_code} - {err_info}")
                 except Exception:
                     pass
             raise e
@@ -274,10 +308,22 @@ class LLMClient:
                 f"• 原因：模型「{self.config.model}」为非标准对话模型（如 Responses/Search 专项模型），服务商限制只能通过 responses 接口访问。\n"
                 f"• 解决：请点击设置⚙️，切换为通用聊天模型（如 claude-3-5-sonnet、claude-3-7-sonnet 或 deepseek-chat）。"
             )
-        elif "401" in err_msg or "unauthorized" in err_msg.lower() or "invalid api key" in err_msg.lower():
+        elif "402" in err_msg or "quota" in err_msg.lower() or "exhausted" in err_msg.lower():
             guidance = (
                 f"\n\n💡【排障指引】\n"
-                f"• 原因：API Key 认证失败或已失效。\n"
+                f"• 原因：服务商当前批次公共预算池已耗尽（402 Budget pool quota has been exhausted）。\n"
+                f"• 解决：平台每天固定批次投放额度（北京时间 10:00 与 19:00），您可以等待下一批次，或切换为 DeepSeek 官方通道继续使用。"
+            )
+        elif "unauthorized client" in err_msg.lower():
+            guidance = (
+                f"\n\n💡【排障指引】\n"
+                f"• 原因：服务商检测到非官方认可的客户端指纹。\n"
+                f"• 解决：当前终端已自动模拟主流支持的客户端签名（claude-cli/codex），若仍受阻请在 AgentRouter 官网控制台检查账号分组状态是否被移入 probation 分组。"
+            )
+        elif "401" in err_msg or "unauthorized" in err_msg.lower() or "invalid api key" in err_msg.lower() or "无效的令牌" in err_msg:
+            guidance = (
+                f"\n\n💡【排障指引】\n"
+                f"• 原因：API Key 认证失败或令牌失效。\n"
                 f"• 解决：请在设置⚙️中检查并重新填入正确的 API Key。"
             )
         else:
